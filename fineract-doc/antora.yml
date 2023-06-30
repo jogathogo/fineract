@@ -3,4 +3,4 @@ title: Fineract Docs
 version: '1.8'
 display_version: 'Fineract 1.8'
 nav:
-- en/nav.adoc
+- fineract-doc/src/docs/en/nav.adoc
