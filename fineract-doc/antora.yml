@@ -1,6 +1,6 @@
-name: en
+name: start
 title: Fineract Docs
 version: '1.8'
 display_version: 'Fineract 1.8'
 nav:
-- fineract-doc/src/docs/en/nav.adoc
+- modules/nav.adoc
