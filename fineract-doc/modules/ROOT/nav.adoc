@@ -1,4 +1,4 @@
 .Project Overview
 * xref:index.adoc[Quick Intro]
-* xref:faq.adoc[Who we are]
+* xref:faq.adoc[FAQs]
 
