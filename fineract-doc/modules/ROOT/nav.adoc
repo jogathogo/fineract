@@ -2,3 +2,8 @@
 * xref:index.adoc[Introduction]
 * xref:faq.adoc[FAQs]
 
+.User zone
+* xref:faq.adoc[FAQs]
+
+.Contributor Zone
+* xref:development:contributor-guide.adoc[Contributor starter pack]
