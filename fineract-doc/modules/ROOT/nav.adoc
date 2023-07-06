@@ -1,6 +1,4 @@
 .Project Overview
-* xref:quick-install.adoc[]
-* xref:features.adoc[]
+* xref:introduction.adoc[Quick Intro]
+* xref:about.adoc[Who we are]
 
-.Contributor Zone
-* xref:development.adoc[How to Setup Project for development]
