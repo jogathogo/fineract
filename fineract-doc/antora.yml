@@ -3,5 +3,5 @@ title: Fineract Docs
 version: '1.8'
 display_version: 'Fineract 1.8'
 nav:
-- modules/nav.adoc
+- modules/ROOT/nav.adoc
 - modules/development/nav.adoc
