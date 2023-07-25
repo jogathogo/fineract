@@ -71,9 +71,9 @@ public class FixedDepositProductHelper {
     private static final String WHOLE_TERM = "1";
     private static final String TILL_PREMATURE_WITHDRAWAL = "2";
 
-    private String name = Utils.randomNameGenerator("FIXED_DEPOSIT_PRODUCT_", 6);
-    private String shortName = Utils.randomNameGenerator("", 4);
-    private String description = Utils.randomNameGenerator("", 20);
+    private String name = Utils.uniqueRandomStringGenerator("FIXED_DEPOSIT_PRODUCT_", 6);
+    private String shortName = Utils.uniqueRandomStringGenerator("", 4);
+    private String description = Utils.randomStringGenerator("", 20);
     private String interestCompoundingPeriodType = MONTHLY;
     private String interestPostingPeriodType = MONTHLY;
     private String interestCalculationType = INTEREST_CALCULATION_USING_DAILY_BALANCE;
@@ -99,17 +99,23 @@ public class FixedDepositProductHelper {
     private String taxGroupId = null;
 
     public String build(final String validFrom, final String validTo) {
+        return build(validFrom, validTo, true);
+    }
+
+    public String build(final String validFrom, final String validTo, final boolean withCharts) {
         final HashMap<String, Object> map = new HashMap<>();
 
         List<HashMap<String, Object>> charts = new ArrayList<HashMap<String, Object>>();
-        HashMap<String, Object> chartsMap = new HashMap<>();
-        chartsMap.put("fromDate", validFrom);
-        chartsMap.put("endDate", validTo);
-        chartsMap.put("dateFormat", "dd MMMM yyyy");
-        chartsMap.put("locale", LOCALE);
-        chartsMap.put("chartSlabs", this.chartSlabs);
-        chartsMap.put("isPrimaryGroupingByAmount", this.isPrimaryGroupingByAmount);
-        charts.add(chartsMap);
+        if (withCharts) {
+            HashMap<String, Object> chartsMap = new HashMap<>();
+            chartsMap.put("fromDate", validFrom);
+            chartsMap.put("endDate", validTo);
+            chartsMap.put("dateFormat", "dd MMMM yyyy");
+            chartsMap.put("locale", LOCALE);
+            chartsMap.put("chartSlabs", this.chartSlabs);
+            chartsMap.put("isPrimaryGroupingByAmount", this.isPrimaryGroupingByAmount);
+            charts.add(chartsMap);
+        }
 
         map.put("charts", charts);
         map.put("name", this.name);

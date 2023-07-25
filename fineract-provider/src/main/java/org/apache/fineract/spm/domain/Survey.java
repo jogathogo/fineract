@@ -18,18 +18,16 @@
  */
 package org.apache.fineract.spm.domain;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.OneToMany;
-import javax.persistence.OrderBy;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 
 @Entity
@@ -57,12 +55,10 @@ public class Survey extends AbstractPersistableCustom {
     private String countryCode;
 
     @Column(name = "valid_from")
-    @Temporal(value = TemporalType.TIMESTAMP)
-    private Date validFrom;
+    private LocalDate validFrom;
 
     @Column(name = "valid_to")
-    @Temporal(value = TemporalType.TIMESTAMP)
-    private Date validTo;
+    private LocalDate validTo;
 
     public Survey() {
 
@@ -122,19 +118,19 @@ public class Survey extends AbstractPersistableCustom {
         this.countryCode = countryCode;
     }
 
-    public Date getValidFrom() {
+    public LocalDate getValidFrom() {
         return validFrom;
     }
 
-    public void setValidFrom(Date validFrom) {
+    public void setValidFrom(LocalDate validFrom) {
         this.validFrom = validFrom;
     }
 
-    public Date getValidTo() {
+    public LocalDate getValidTo() {
         return validTo;
     }
 
-    public void setValidTo(Date validTo) {
+    public void setValidTo(LocalDate validTo) {
         this.validTo = validTo;
     }
 }

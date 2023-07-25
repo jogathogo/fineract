@@ -24,6 +24,8 @@ import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -35,8 +37,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
+import java.util.UUID;
 import org.apache.fineract.infrastructure.bulkimport.constants.SavingsConstants;
 import org.apache.fineract.infrastructure.bulkimport.constants.TemplatePopulateImportConstants;
 import org.apache.fineract.integrationtests.common.GroupHelper;
@@ -86,9 +87,9 @@ public class SavingsImportHandlerTest {
         OfficeDomain office = officeHelper.retrieveOfficeByID(outcome_office_creation);
         Assertions.assertNotNull(office, "Could not retrieve created office");
 
-        String firstName = Utils.randomNameGenerator("Client_FirstName_", 5);
-        String lastName = Utils.randomNameGenerator("Client_LastName_", 4);
-        String externalId = Utils.randomStringGenerator("ID_", 7, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        String firstName = Utils.randomStringGenerator("Client_FirstName_", 5);
+        String lastName = Utils.randomStringGenerator("Client_LastName_", 4);
+        String externalId = UUID.randomUUID().toString();
 
         final HashMap<String, Object> clientMap = new HashMap<>();
         clientMap.put("officeId", outcome_office_creation.toString());

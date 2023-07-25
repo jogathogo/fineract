@@ -18,27 +18,23 @@
  */
 package org.apache.fineract.portfolio.shareproducts.domain;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Embedded;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.OneToMany;
-import javax.persistence.OrderBy;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
 import org.apache.fineract.accounting.common.AccountingRuleType;
 import org.apache.fineract.infrastructure.core.domain.AbstractAuditableCustom;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
@@ -46,7 +42,6 @@ import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.portfolio.charge.domain.Charge;
 import org.apache.fineract.portfolio.common.domain.PeriodFrequencyType;
 import org.apache.fineract.portfolio.shareproducts.data.ShareProductMarketPriceData;
-import org.apache.fineract.useradministration.domain.AppUser;
 
 @SuppressWarnings("serial")
 @Entity
@@ -63,12 +58,10 @@ public class ShareProduct extends AbstractAuditableCustom {
     private String description;
 
     @Column(name = "start_date")
-    @Temporal(TemporalType.DATE)
-    private Date startDate;
+    private LocalDate startDate;
 
     @Column(name = "end_date")
-    @Temporal(TemporalType.DATE)
-    private Date endDate;
+    private LocalDate endDate;
 
     @Column(name = "external_id", length = 100, nullable = true, unique = true)
     private String externalId;
@@ -137,8 +130,7 @@ public class ShareProduct extends AbstractAuditableCustom {
             final BigDecimal shareCapital, final Long minimumShares, final Long nominalShares, final Long maximumShares,
             Set<ShareProductMarketPrice> marketPrice, Set<Charge> charges, final Boolean allowDividendCalculationForInactiveClients,
             final Integer lockinPeriod, final PeriodFrequencyType lockPeriodType, final Integer minimumActivePeriod,
-            final PeriodFrequencyType minimumActivePeriodForDividendsType, AppUser createdBy, ZonedDateTime createdDate,
-            AppUser lastModifiedBy, ZonedDateTime lastModifiedDate, final AccountingRuleType accountingRuleType) {
+            final PeriodFrequencyType minimumActivePeriodForDividendsType, final AccountingRuleType accountingRuleType) {
 
         this.name = name;
         this.shortName = shortName;
@@ -159,12 +151,9 @@ public class ShareProduct extends AbstractAuditableCustom {
         this.lockPeriodType = lockPeriodType;
         this.minimumActivePeriod = minimumActivePeriod;
         this.minimumActivePeriodType = minimumActivePeriodForDividendsType;
-        setCreatedBy(createdBy);
-        setCreatedDate(Instant.ofEpochMilli(createdDate.toInstant().toEpochMilli()));
-        setLastModifiedBy(lastModifiedBy);
-        setLastModifiedDate(Instant.ofEpochMilli(lastModifiedDate.toInstant().toEpochMilli()));
-        startDate = DateUtils.getDateOfTenant();
-        endDate = DateUtils.getDateOfTenant();
+        // TODO: is this used at all?
+        this.startDate = DateUtils.getBusinessLocalDate();
+        this.endDate = DateUtils.getBusinessLocalDate();
         if (accountingRuleType != null) {
             this.accountingRule = accountingRuleType.getValue();
         }
@@ -288,13 +277,13 @@ public class ShareProduct extends AbstractAuditableCustom {
         if (marketPrice != null && marketPrice.size() > 0) {
             for (ShareProductMarketPriceData data : marketPrice) {
                 if (data.getId() == null) {
-                    ShareProductMarketPrice entity = new ShareProductMarketPrice(data.getStartDate(), data.getShareValue());
+                    ShareProductMarketPrice entity = new ShareProductMarketPrice(data.getFromDate(), data.getShareValue());
                     entity.setShareProduct(this);
                     marketPriceTemp.add(entity);
                 } else {
                     for (ShareProductMarketPrice priceData : this.marketPrice) {
                         if (priceData.getId().equals(data.getId())) {
-                            priceData.setStartDate(data.getStartDate());
+                            priceData.setStartDate(data.getFromDate());
                             priceData.setShareValue(data.getShareValue());
                             marketPriceTemp.add(priceData);
                         }
@@ -402,12 +391,12 @@ public class ShareProduct extends AbstractAuditableCustom {
         return allowed;
     }
 
-    public BigDecimal deriveMarketPrice(final Date currentDate) {
+    public BigDecimal deriveMarketPrice(final LocalDate currentDate) {
         BigDecimal marketValue = this.unitPrice;
         if (this.marketPrice != null && !this.marketPrice.isEmpty()) {
             for (ShareProductMarketPrice data : this.marketPrice) {
-                Date futureDate = data.getStartDate();
-                if (currentDate.compareTo(futureDate) == 0 ? Boolean.TRUE : Boolean.FALSE || currentDate.after(futureDate)) {
+                LocalDate futureDate = data.getStartDate();
+                if (currentDate.compareTo(futureDate) == 0 ? Boolean.TRUE : Boolean.FALSE || currentDate.isAfter(futureDate)) {
                     marketValue = data.getPrice();
                 }
             }

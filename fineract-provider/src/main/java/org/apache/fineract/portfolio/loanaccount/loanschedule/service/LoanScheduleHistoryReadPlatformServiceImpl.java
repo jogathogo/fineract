@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.fineract.infrastructure.core.domain.JdbcSupport;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
@@ -80,10 +81,16 @@ public class LoanScheduleHistoryReadPlatformServiceImpl implements LoanScheduleH
             final String sql = "select " + fullResultsetExtractor.schema()
                     + " where ls.loan_id = ? and ls.version = ? order by ls.loan_id, ls.installment";
 
-            return this.jdbcTemplate.query(sql, fullResultsetExtractor, new Object[] { loanId, versionNumber }); // NOSONAR
+            return this.jdbcTemplate.query(sql, fullResultsetExtractor, loanId, versionNumber); // NOSONAR
         } catch (final EmptyResultDataAccessException e) {
             throw new LoanNotFoundException(loanId, e);
         }
+    }
+
+    @Override
+    public Map<String, Object> fetchOldAuditDates(Long id) {
+        final String sql = "select lrs.created_date, lrs.lastmodified_date from m_loan_repayment_schedule lrs where lrs.id = ?";
+        return this.jdbcTemplate.queryForMap(sql, id);
     }
 
     private static final class LoanScheduleArchiveResultSetExtractor implements ResultSetExtractor<LoanScheduleData> {
@@ -101,7 +108,7 @@ public class LoanScheduleHistoryReadPlatformServiceImpl implements LoanScheduleH
             this.disbursement = repaymentScheduleRelatedLoanData.disbursementData();
             this.totalFeeChargesDueAtDisbursement = repaymentScheduleRelatedLoanData.getTotalFeeChargesAtDisbursement();
             this.lastDueDate = this.disbursement.disbursementDate();
-            this.outstandingLoanPrincipalBalance = this.disbursement.amount();
+            this.outstandingLoanPrincipalBalance = this.disbursement.getPrincipal();
             this.disbursementData = disbursementData;
         }
 
@@ -118,16 +125,16 @@ public class LoanScheduleHistoryReadPlatformServiceImpl implements LoanScheduleH
         public LoanScheduleData extractData(final ResultSet rs) throws SQLException, DataAccessException {
 
             final LoanSchedulePeriodData disbursementPeriod = LoanSchedulePeriodData.disbursementOnlyPeriod(
-                    this.disbursement.disbursementDate(), this.disbursement.amount(), this.totalFeeChargesDueAtDisbursement,
+                    this.disbursement.disbursementDate(), this.disbursement.getPrincipal(), this.totalFeeChargesDueAtDisbursement,
                     this.disbursement.isDisbursed());
 
             final Collection<LoanSchedulePeriodData> periods = new ArrayList<>();
-            final MonetaryCurrency monCurrency = new MonetaryCurrency(this.currency.code(), this.currency.decimalPlaces(),
-                    this.currency.currencyInMultiplesOf());
+            final MonetaryCurrency monCurrency = new MonetaryCurrency(this.currency.getCode(), this.currency.getDecimalPlaces(),
+                    this.currency.getInMultiplesOf());
             BigDecimal totalPrincipalDisbursed = BigDecimal.ZERO;
             if (disbursementData == null || disbursementData.isEmpty()) {
                 periods.add(disbursementPeriod);
-                totalPrincipalDisbursed = Money.of(monCurrency, this.disbursement.amount()).getAmount();
+                totalPrincipalDisbursed = Money.of(monCurrency, this.disbursement.getPrincipal()).getAmount();
             } else {
                 this.outstandingLoanPrincipalBalance = BigDecimal.ZERO;
             }
@@ -139,10 +146,10 @@ public class LoanScheduleHistoryReadPlatformServiceImpl implements LoanScheduleH
             Money totalRepaymentExpected = Money.zero(monCurrency);
 
             // update totals with details of fees charged during disbursement
-            totalFeeChargesCharged = totalFeeChargesCharged.plus(disbursementPeriod.feeChargesDue());
-            totalRepaymentExpected = totalRepaymentExpected.plus(disbursementPeriod.feeChargesDue());
+            totalFeeChargesCharged = totalFeeChargesCharged.plus(disbursementPeriod.getFeeChargesDue());
+            totalRepaymentExpected = totalRepaymentExpected.plus(disbursementPeriod.getFeeChargesDue());
 
-            Integer loanTermInDays = Integer.valueOf(0);
+            Integer loanTermInDays = 0;
             while (rs.next()) {
                 final Integer period = JdbcSupport.getInteger(rs, "period");
                 LocalDate fromDate = JdbcSupport.getLocalDate(rs, "fromDate");
@@ -151,27 +158,27 @@ public class LoanScheduleHistoryReadPlatformServiceImpl implements LoanScheduleH
                     BigDecimal principal = BigDecimal.ZERO;
                     for (DisbursementData data : disbursementData) {
                         if (fromDate.equals(this.disbursement.disbursementDate()) && data.disbursementDate().equals(fromDate)) {
-                            principal = principal.add(data.amount());
+                            principal = principal.add(data.getPrincipal());
                             final LoanSchedulePeriodData periodData = LoanSchedulePeriodData.disbursementOnlyPeriod(data.disbursementDate(),
-                                    data.amount(), this.totalFeeChargesDueAtDisbursement, data.isDisbursed());
+                                    data.getPrincipal(), this.totalFeeChargesDueAtDisbursement, data.isDisbursed());
                             periods.add(periodData);
-                            this.outstandingLoanPrincipalBalance = this.outstandingLoanPrincipalBalance.add(data.amount());
+                            this.outstandingLoanPrincipalBalance = this.outstandingLoanPrincipalBalance.add(data.getPrincipal());
                         } else if (data.isDueForDisbursement(fromDate, dueDate)
                                 && this.outstandingLoanPrincipalBalance.compareTo(BigDecimal.ZERO) > 0) {
-                            principal = principal.add(data.amount());
+                            principal = principal.add(data.getPrincipal());
                             final LoanSchedulePeriodData periodData = LoanSchedulePeriodData.disbursementOnlyPeriod(data.disbursementDate(),
-                                    data.amount(), BigDecimal.ZERO, data.isDisbursed());
+                                    data.getPrincipal(), BigDecimal.ZERO, data.isDisbursed());
                             periods.add(periodData);
-                            this.outstandingLoanPrincipalBalance = this.outstandingLoanPrincipalBalance.add(data.amount());
+                            this.outstandingLoanPrincipalBalance = this.outstandingLoanPrincipalBalance.add(data.getPrincipal());
                         }
                     }
                     totalPrincipalDisbursed = totalPrincipalDisbursed.add(principal);
                 }
 
-                Integer daysInPeriod = Integer.valueOf(0);
+                Integer daysInPeriod = 0;
                 if (fromDate != null) {
                     daysInPeriod = Math.toIntExact(ChronoUnit.DAYS.between(fromDate, dueDate));
-                    loanTermInDays = Integer.valueOf(loanTermInDays.intValue() + daysInPeriod.intValue());
+                    loanTermInDays = loanTermInDays + daysInPeriod;
                 }
 
                 final BigDecimal principalDue = JdbcSupport.getBigDecimalDefaultToZeroIfNull(rs, "principalDue");

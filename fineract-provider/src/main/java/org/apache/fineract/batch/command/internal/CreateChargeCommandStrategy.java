@@ -18,16 +18,17 @@
  */
 package org.apache.fineract.batch.command.internal;
 
+import static org.apache.fineract.batch.command.CommandStrategyUtils.relativeUrlWithoutVersion;
+
 import com.google.common.base.Splitter;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.List;
-import javax.ws.rs.core.UriInfo;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.batch.command.CommandStrategy;
 import org.apache.fineract.batch.domain.BatchRequest;
 import org.apache.fineract.batch.domain.BatchResponse;
-import org.apache.fineract.batch.exception.ErrorHandler;
-import org.apache.fineract.batch.exception.ErrorInfo;
 import org.apache.fineract.portfolio.loanaccount.api.LoanChargesApiResource;
+import org.apache.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -58,31 +59,18 @@ public class CreateChargeCommandStrategy implements CommandStrategy {
         response.setRequestId(request.getRequestId());
         response.setHeaders(request.getHeaders());
 
-        final List<String> pathParameters = Splitter.on('/').splitToList(request.getRelativeUrl());
-        Long loanId = Long.parseLong(pathParameters.get(1));
+        final List<String> pathParameters = Splitter.on('/').splitToList(relativeUrlWithoutVersion(request));
+        final Long loanId = Long.parseLong(pathParameters.get(1));
 
-        // Try-catch blocks to map exceptions to appropriate status codes
-        try {
+        // Calls 'executeLoanCharge' function from 'LoanChargesApiResource'
+        // to create
+        // a new charge for a loan
+        responseBody = loanChargesApiResource.executeLoanCharge(loanId, null, request.getBody());
 
-            // Calls 'executeLoanCharge' function from 'LoanChargesApiResource'
-            // to create
-            // a new charge for a loan
-            responseBody = loanChargesApiResource.executeLoanCharge(loanId, null, request.getBody());
-
-            response.setStatusCode(200);
-            // Sets the body of the response after Charge has been successfully
-            // created
-            response.setBody(responseBody);
-
-        } catch (RuntimeException e) {
-
-            // Gets an object of type ErrorInfo, containing information about
-            // raised exception
-            ErrorInfo ex = ErrorHandler.handler(e);
-
-            response.setStatusCode(ex.getStatusCode());
-            response.setBody(ex.getMessage());
-        }
+        response.setStatusCode(HttpStatus.SC_OK);
+        // Sets the body of the response after Charge has been successfully
+        // created
+        response.setBody(responseBody);
 
         return response;
     }

@@ -18,20 +18,20 @@
  */
 package org.apache.fineract.infrastructure.reportmailingjob.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
-import javax.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.domain.AbstractAuditableCustom;
@@ -39,11 +39,14 @@ import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.dataqueries.domain.Report;
 import org.apache.fineract.infrastructure.reportmailingjob.ReportMailingJobConstants;
 import org.apache.fineract.infrastructure.reportmailingjob.data.ReportMailingJobEmailAttachmentFileFormat;
-import org.apache.fineract.infrastructure.reportmailingjob.data.ReportMailingJobPreviousRunStatus;
 import org.apache.fineract.useradministration.domain.AppUser;
 
 @Entity
 @Table(name = "m_report_mailing_job", uniqueConstraints = { @UniqueConstraint(columnNames = { "name" }, name = "unique_name") })
+@Getter
+@Setter
+@NoArgsConstructor
+@Accessors(chain = true)
 public class ReportMailingJob extends AbstractAuditableCustom {
 
     private static final long serialVersionUID = -2197602941230009227L;
@@ -55,8 +58,7 @@ public class ReportMailingJob extends AbstractAuditableCustom {
     private String description;
 
     @Column(name = "start_datetime", nullable = false)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date startDateTime;
+    private LocalDateTime startDateTime;
 
     @Column(name = "recurrence", nullable = true)
     private String recurrence;
@@ -81,12 +83,10 @@ public class ReportMailingJob extends AbstractAuditableCustom {
     private String stretchyReportParamMap;
 
     @Column(name = "previous_run_datetime", nullable = true)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date previousRunDateTime;
+    private LocalDateTime previousRunDateTime;
 
     @Column(name = "next_run_datetime", nullable = true)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date nextRunDateTime;
+    private LocalDateTime nextRunDateTime;
 
     @Column(name = "previous_run_status", nullable = true)
     private String previousRunStatus;
@@ -111,64 +111,6 @@ public class ReportMailingJob extends AbstractAuditableCustom {
     private AppUser runAsUser;
 
     /**
-     * ReportMailingJob protected constructor
-     **/
-    protected ReportMailingJob() {}
-
-    /**
-     * ReportMailingJob private constructor
-     **/
-    private ReportMailingJob(final String name, final String description, final LocalDateTime startDateTime, final String recurrence,
-            final String emailRecipients, final String emailSubject, final String emailMessage,
-            final ReportMailingJobEmailAttachmentFileFormat emailAttachmentFileFormat, final Report stretchyReport,
-            final String stretchyReportParamMap, final LocalDateTime previousRunDateTime, final LocalDateTime nextRunDateTime,
-            final ReportMailingJobPreviousRunStatus previousRunStatus, final String previousRunErrorLog,
-            final String previousRunErrorMessage, final boolean isActive, final boolean isDeleted, final AppUser runAsUser) {
-        this.name = name;
-        this.description = description;
-        this.startDateTime = null;
-
-        if (startDateTime != null) {
-            this.startDateTime = Date.from(startDateTime.atZone(DateUtils.getDateTimeZoneOfTenant()).toInstant());
-        }
-
-        this.recurrence = recurrence;
-        this.emailRecipients = emailRecipients;
-        this.emailSubject = emailSubject;
-        this.emailMessage = emailMessage;
-        this.emailAttachmentFileFormat = emailAttachmentFileFormat.getValue();
-        this.stretchyReport = stretchyReport;
-        this.stretchyReportParamMap = stretchyReportParamMap;
-        this.previousRunDateTime = null;
-
-        if (previousRunDateTime != null) {
-            this.previousRunDateTime = Date.from(previousRunDateTime.atZone(DateUtils.getDateTimeZoneOfTenant()).toInstant());
-        }
-
-        this.nextRunDateTime = null;
-
-        if (nextRunDateTime != null) {
-            this.nextRunDateTime = Date.from(nextRunDateTime.atZone(DateUtils.getDateTimeZoneOfTenant()).toInstant());
-        }
-
-        this.previousRunStatus = null;
-
-        if (previousRunStatus != null) {
-            this.previousRunStatus = previousRunStatus.getValue();
-        }
-
-        if (numberOfRuns == null) {
-            this.numberOfRuns = 0;
-        }
-
-        this.previousRunErrorLog = previousRunErrorLog;
-        this.previousRunErrorMessage = previousRunErrorMessage;
-        this.isActive = isActive;
-        this.isDeleted = isDeleted;
-        this.runAsUser = runAsUser;
-    }
-
-    /**
      * create a new instance of the ReportMailingJob for a new entry
      *
      * @return ReportMailingJob object
@@ -177,9 +119,10 @@ public class ReportMailingJob extends AbstractAuditableCustom {
             final String recurrence, final String emailRecipients, final String emailSubject, final String emailMessage,
             final ReportMailingJobEmailAttachmentFileFormat emailAttachmentFileFormat, final Report stretchyReport,
             final String stretchyReportParamMap, final boolean isActive, final AppUser runAsUser) {
-        return new ReportMailingJob(name, description, startDateTime, recurrence, emailRecipients, emailSubject, emailMessage,
-                emailAttachmentFileFormat, stretchyReport, stretchyReportParamMap, null, null, null, null, null, isActive, false,
-                runAsUser);
+        return new ReportMailingJob().setName(name).setDescription(description).setStartDateTime(startDateTime).setRecurrence(recurrence)
+                .setEmailRecipients(emailRecipients).setEmailSubject(emailSubject).setEmailMessage(emailMessage)
+                .setEmailAttachmentFileFormat(emailAttachmentFileFormat.getValue()).setStretchyReport(stretchyReport)
+                .setStretchyReportParamMap(stretchyReportParamMap).setActive(isActive).setDeleted(false).setRunAsUser(runAsUser);
     }
 
     /**
@@ -214,9 +157,11 @@ public class ReportMailingJob extends AbstractAuditableCustom {
             }
         }
 
-        return new ReportMailingJob(name, description, startDateTime, recurrence, emailRecipients, emailSubject, emailMessage,
-                emailAttachmentFileFormat, stretchyReport, stretchyReportParamMap, null, startDateTime, null, null, null, isActive, false,
-                runAsUser);
+        return new ReportMailingJob().setName(name).setDescription(description).setStartDateTime(startDateTime).setRecurrence(recurrence)
+                .setEmailRecipients(emailRecipients).setEmailSubject(emailSubject).setEmailMessage(emailMessage)
+                .setEmailAttachmentFileFormat(emailAttachmentFileFormat.getValue()).setStretchyReport(stretchyReport)
+                .setStretchyReportParamMap(stretchyReportParamMap).setNextRunDateTime(startDateTime).setActive(isActive).setDeleted(false)
+                .setRunAsUser(runAsUser);
     }
 
     /**
@@ -307,14 +252,12 @@ public class ReportMailingJob extends AbstractAuditableCustom {
             final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(jsonCommand.dateFormat())
                     .withLocale(jsonCommand.extractLocale());
             final LocalDateTime newStartDateTime = LocalDateTime.parse(newStartDateTimeString, dateTimeFormatter);
-            final LocalDateTime oldStartDateTime = (this.startDateTime != null)
-                    ? ZonedDateTime.ofInstant(this.startDateTime.toInstant(), DateUtils.getDateTimeZoneOfTenant()).toLocalDateTime()
-                    : null;
+            final LocalDateTime oldStartDateTime = this.startDateTime;
 
             if ((oldStartDateTime != null) && !newStartDateTime.equals(oldStartDateTime)) {
                 actualChanges.put(ReportMailingJobConstants.START_DATE_TIME_PARAM_NAME, newStartDateTimeString);
 
-                this.startDateTime = Date.from(newStartDateTime.atZone(DateUtils.getDateTimeZoneOfTenant()).toInstant());
+                this.startDateTime = newStartDateTime;
             }
         }
 
@@ -334,19 +277,6 @@ public class ReportMailingJob extends AbstractAuditableCustom {
     }
 
     /**
-     * update the stretchy report entity associated with the credit check
-     *
-     * @param stretchyReport
-     *            -- Report entity
-     *
-     **/
-    public void update(final Report stretchyReport) {
-        if (stretchyReport != null) {
-            this.stretchyReport = stretchyReport;
-        }
-    }
-
-    /**
      * delete the report mailing job, set the isDeleted property to 1 and alter the name
      *
      *
@@ -358,158 +288,6 @@ public class ReportMailingJob extends AbstractAuditableCustom {
     }
 
     /**
-     * @return the value of the name property
-     **/
-    public String getName() {
-        return this.name;
-    }
-
-    /**
-     * @return the value of the description property
-     **/
-    public String getDescription() {
-        return this.description;
-    }
-
-    /**
-     * @return the value of the startDateTime property
-     **/
-    public ZonedDateTime getStartDateTime() {
-        return (this.startDateTime != null) ? ZonedDateTime.ofInstant(this.startDateTime.toInstant(), DateUtils.getDateTimeZoneOfTenant())
-                : null;
-    }
-
-    /**
-     * @return the value of the recurrence property
-     **/
-    public String getRecurrence() {
-        return this.recurrence;
-    }
-
-    /**
-     * @return value of the isDeleted property
-     **/
-    public boolean isDeleted() {
-        return this.isDeleted;
-    }
-
-    /**
-     * @return boolean true if isDeleted property equals 0, else false
-     **/
-    public boolean isNotDeleted() {
-        return !this.isDeleted;
-    }
-
-    /**
-     * @return the value of the isActive property
-     **/
-    public boolean isActive() {
-        return this.isActive;
-    }
-
-    /**
-     * @return boolean true if isActive property equals 0, else false
-     **/
-    public boolean isNotActive() {
-        return !this.isActive;
-    }
-
-    /**
-     * @return the emailRecipients
-     */
-    public String getEmailRecipients() {
-        return emailRecipients;
-    }
-
-    /**
-     * @return the emailSubject
-     */
-    public String getEmailSubject() {
-        return emailSubject;
-    }
-
-    /**
-     * @return the emailMessage
-     */
-    public String getEmailMessage() {
-        return emailMessage;
-    }
-
-    /**
-     * @return the emailAttachmentFileFormat
-     */
-    public String getEmailAttachmentFileFormat() {
-        return emailAttachmentFileFormat;
-    }
-
-    /**
-     * @return the stretchyReport
-     */
-    public Report getStretchyReport() {
-        return stretchyReport;
-    }
-
-    /**
-     * @return the stretchyReportParamMap
-     */
-    public String getStretchyReportParamMap() {
-        return stretchyReportParamMap;
-    }
-
-    /**
-     * @return the previousRunDateTime
-     */
-    public ZonedDateTime getPreviousRunDateTime() {
-        return (this.previousRunDateTime != null)
-                ? ZonedDateTime.ofInstant(this.previousRunDateTime.toInstant(), DateUtils.getDateTimeZoneOfTenant())
-                : null;
-    }
-
-    /**
-     * @return the nextRunDateTime
-     */
-    public ZonedDateTime getNextRunDateTime() {
-        return (this.nextRunDateTime != null)
-                ? ZonedDateTime.ofInstant(this.nextRunDateTime.toInstant(), DateUtils.getDateTimeZoneOfTenant())
-                : null;
-    }
-
-    /**
-     * @return the previousRunStatus
-     */
-    public String getPreviousRunStatus() {
-        return previousRunStatus;
-    }
-
-    /**
-     * @return the previousRunErrorLog
-     */
-    public String getPreviousRunErrorLog() {
-        return previousRunErrorLog;
-    }
-
-    /**
-     * @return the previousRunErrorMessage
-     */
-    public String getPreviousRunErrorMessage() {
-        return previousRunErrorMessage;
-    }
-
-    /**
-     * @return the numberOfRuns
-     */
-    public Integer getNumberOfRuns() {
-        return numberOfRuns;
-    }
-
-    /**
-     * @return the runAsUser
-     */
-    public AppUser getRunAsUser() {
-        return runAsUser;
-    }
-
-    /**
      * increase the numberOfRuns by 1
      *
      *
@@ -518,66 +296,4 @@ public class ReportMailingJob extends AbstractAuditableCustom {
         this.numberOfRuns++;
     }
 
-    /**
-     * update the previousRunStatus
-     *
-     * @param previousRunStatus
-     *            -- the status of the previous job execution
-     *
-     **/
-    public void updatePreviousRunStatus(final String previousRunStatus) {
-        if (!StringUtils.isEmpty(previousRunStatus)) {
-            this.previousRunStatus = previousRunStatus;
-        }
-    }
-
-    /**
-     * update the previousRunDateTime
-     *
-     * @param previousRunDateTime
-     *            -- previous run date
-     *
-     **/
-    public void updatePreviousRunDateTime(final ZonedDateTime previousRunDateTime) {
-        if (previousRunDateTime != null) {
-            this.previousRunDateTime = Date.from(previousRunDateTime.toInstant());
-        }
-    }
-
-    /**
-     * update the nextRunDateTime
-     *
-     * @param nextRunDateTime
-     *            -- the next run DateTime
-     *
-     **/
-    public void updateNextRunDateTime(final ZonedDateTime nextRunDateTime) {
-        if (nextRunDateTime != null) {
-            this.nextRunDateTime = Date.from(nextRunDateTime.toInstant());
-        }
-
-        else {
-            this.nextRunDateTime = null;
-        }
-    }
-
-    /**
-     * deactivate the report mailing job by setting the isActive property to 0
-     *
-     *
-     **/
-    public void deactivate() {
-        this.isActive = false;
-    }
-
-    /**
-     * update the previousRunErrorLog property
-     *
-     * @param previousRunErrorLog
-     *            -- the previous job run error log
-     *
-     **/
-    public void updatePreviousRunErrorLog(final String previousRunErrorLog) {
-        this.previousRunErrorLog = previousRunErrorLog;
-    }
 }

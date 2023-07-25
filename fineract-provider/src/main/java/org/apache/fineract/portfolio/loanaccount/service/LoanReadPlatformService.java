@@ -21,14 +21,13 @@ package org.apache.fineract.portfolio.loanaccount.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
+import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.infrastructure.core.service.Page;
 import org.apache.fineract.infrastructure.core.service.SearchParameters;
 import org.apache.fineract.organisation.staff.data.StaffData;
 import org.apache.fineract.portfolio.calendar.data.CalendarData;
 import org.apache.fineract.portfolio.floatingrates.data.InterestRatePeriodData;
-import org.apache.fineract.portfolio.loanaccount.data.CollectionData;
 import org.apache.fineract.portfolio.loanaccount.data.DisbursementData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanAccountData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanApprovalData;
@@ -36,8 +35,10 @@ import org.apache.fineract.portfolio.loanaccount.data.LoanRepaymentScheduleInsta
 import org.apache.fineract.portfolio.loanaccount.data.LoanScheduleAccrualData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionData;
+import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionRelationData;
 import org.apache.fineract.portfolio.loanaccount.data.PaidInAdvanceData;
 import org.apache.fineract.portfolio.loanaccount.data.RepaymentScheduleRelatedLoanData;
+import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanScheduleData;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanSchedulePeriodData;
@@ -46,6 +47,8 @@ import org.apache.fineract.portfolio.loanaccount.loanschedule.data.OverdueLoanSc
 public interface LoanReadPlatformService {
 
     LoanAccountData retrieveOne(Long loanId);
+
+    LoanAccountData fetchRepaymentScheduleData(LoanAccountData accountData);
 
     LoanScheduleData retrieveRepaymentSchedule(Long loanId, RepaymentScheduleRelatedLoanData repaymentScheduleRelatedData,
             Collection<DisbursementData> disbursementData, boolean isInterestRecalculationEnabled, BigDecimal totalPaidFeeCharges);
@@ -93,6 +96,8 @@ public interface LoanReadPlatformService {
      */
     Collection<OverdueLoanScheduleData> retrieveAllLoansWithOverdueInstallments(Long penaltyWaitPeriod, Boolean backdatePenalties);
 
+    Collection<OverdueLoanScheduleData> retrieveAllOverdueInstallmentsForLoan(Loan loan);
+
     Integer retriveLoanCounter(Long groupId, Integer loanType, Long productId);
 
     Integer retriveLoanCounter(Long clientId, Long productId);
@@ -109,7 +114,11 @@ public interface LoanReadPlatformService {
 
     LoanTransactionData retrieveLoanWriteoffTemplate(Long loanId);
 
-    Collection<LoanScheduleAccrualData> retrivePeriodicAccrualData(LocalDate tillDate);
+    Collection<LoanScheduleAccrualData> retrievePeriodicAccrualData(LocalDate tillDate);
+
+    Collection<LoanScheduleAccrualData> retrievePeriodicAccrualData(LocalDate tillDate, Loan loan);
+
+    LoanTransactionData retrieveLoanChargeOffTemplate(Long loanId);
 
     Collection<Long> fetchLoansForInterestRecalculation();
 
@@ -123,7 +132,7 @@ public interface LoanReadPlatformService {
 
     boolean isGuaranteeRequired(Long loanId);
 
-    Date retrieveMinimumDateOfRepaymentTransaction(Long loanId);
+    LocalDate retrieveMinimumDateOfRepaymentTransaction(Long loanId);
 
     PaidInAdvanceData retrieveTotalPaidInAdvance(Long loanId);
 
@@ -151,5 +160,9 @@ public interface LoanReadPlatformService {
 
     List<LoanRepaymentScheduleInstallmentData> getRepaymentDataResponse(Long loanId);
 
-    CollectionData retrieveLoanCollectionData(Long loanId);
+    List<LoanTransactionRelationData> retrieveLoanTransactionRelationsByLoanTransactionId(Long loanTransactionId);
+
+    Long retrieveLoanTransactionIdByExternalId(ExternalId externalId);
+
+    Long retrieveLoanIdByExternalId(ExternalId externalId);
 }

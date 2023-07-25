@@ -18,9 +18,9 @@
  */
 package org.apache.fineract.infrastructure.entityaccess.service;
 
-import java.util.Date;
+import jakarta.persistence.PersistenceException;
+import java.time.LocalDate;
 import java.util.Map;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -95,12 +95,12 @@ public class FineractEntityAccessWriteServiceImpl implements FineractEntityAcces
 
             final Long fromId = command.longValueOfParameterNamed(FineractEntityApiResourceConstants.fromEnityType);
             final Long toId = command.longValueOfParameterNamed(FineractEntityApiResourceConstants.toEntityType);
-            final Date startDate = command.dateValueOfParameterNamed(FineractEntityApiResourceConstants.startDate);
-            final Date endDate = command.dateValueOfParameterNamed(FineractEntityApiResourceConstants.endDate);
+            final LocalDate startDate = command.localDateValueOfParameterNamed(FineractEntityApiResourceConstants.startDate);
+            final LocalDate endDate = command.localDateValueOfParameterNamed(FineractEntityApiResourceConstants.endDate);
 
             fromApiJsonDeserializer.checkForEntity(relId.toString(), fromId, toId);
             if (startDate != null && endDate != null) {
-                if (endDate.before(startDate)) {
+                if (endDate.isBefore(startDate)) {
                     throw new FineractEntityToEntityMappingDateException(startDate.toString(), endDate.toString());
                 }
             }

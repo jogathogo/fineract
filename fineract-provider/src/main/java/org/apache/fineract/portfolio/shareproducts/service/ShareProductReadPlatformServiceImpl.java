@@ -19,10 +19,11 @@
 package org.apache.fineract.portfolio.shareproducts.service;
 
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,7 +45,7 @@ import org.apache.fineract.portfolio.charge.data.ChargeData;
 import org.apache.fineract.portfolio.charge.service.ChargeReadPlatformService;
 import org.apache.fineract.portfolio.products.data.ProductData;
 import org.apache.fineract.portfolio.products.exception.ProductNotFoundException;
-import org.apache.fineract.portfolio.products.service.ProductReadPlatformService;
+import org.apache.fineract.portfolio.products.service.ShareProductReadPlatformService;
 import org.apache.fineract.portfolio.shareaccounts.service.SharesEnumerations;
 import org.apache.fineract.portfolio.shareproducts.data.ShareProductData;
 import org.apache.fineract.portfolio.shareproducts.data.ShareProductMarketPriceData;
@@ -55,7 +56,7 @@ import org.springframework.stereotype.Service;
 
 @Service(value = "shareReadPlatformService")
 @RequiredArgsConstructor
-public class ShareProductReadPlatformServiceImpl implements ProductReadPlatformService {
+public class ShareProductReadPlatformServiceImpl implements ShareProductReadPlatformService {
 
     private final JdbcTemplate jdbcTemplate;
     private final CurrencyReadPlatformService currencyReadPlatformService;
@@ -178,7 +179,8 @@ public class ShareProductReadPlatformServiceImpl implements ProductReadPlatformS
             final Long id = rs.getLong("id");
             final Date fromDate = rs.getDate("from_date");
             final BigDecimal shareValue = rs.getBigDecimal("share_value");
-            return new ShareProductMarketPriceData(id, fromDate, shareValue);
+            final LocalDate fromLocalDate = fromDate != null ? fromDate.toLocalDate() : null;
+            return new ShareProductMarketPriceData(id, fromLocalDate, shareValue);
         }
 
         public String schema() {

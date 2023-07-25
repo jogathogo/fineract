@@ -30,13 +30,14 @@ import static org.apache.fineract.infrastructure.hooks.api.HookApiConstants.webT
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import jakarta.persistence.PersistenceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.PersistenceException;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
@@ -62,7 +63,6 @@ import org.apache.fineract.infrastructure.security.service.PlatformSecurityConte
 import org.apache.fineract.template.domain.Template;
 import org.apache.fineract.template.domain.TemplateRepository;
 import org.apache.fineract.template.exception.TemplateNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.jpa.JpaSystemException;
@@ -70,6 +70,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatformService {
 
     private final PlatformSecurityContext context;
@@ -79,20 +80,6 @@ public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatf
     private final HookCommandFromApiJsonDeserializer fromApiJsonDeserializer;
     private final FromJsonHelper fromApiJsonHelper;
     private final ProcessorHelper processorHelper;
-
-    @Autowired
-    public HookWritePlatformServiceJpaRepositoryImpl(final PlatformSecurityContext context, final HookRepository hookRepository,
-            final HookTemplateRepository hookTemplateRepository, final TemplateRepository ugdTemplateRepository,
-            final HookCommandFromApiJsonDeserializer fromApiJsonDeserializer, final FromJsonHelper fromApiJsonHelper,
-            ProcessorHelper processorHelper) {
-        this.context = context;
-        this.hookRepository = hookRepository;
-        this.hookTemplateRepository = hookTemplateRepository;
-        this.ugdTemplateRepository = ugdTemplateRepository;
-        this.fromApiJsonDeserializer = fromApiJsonDeserializer;
-        this.fromApiJsonHelper = fromApiJsonHelper;
-        this.processorHelper = processorHelper;
-    }
 
     @Transactional
     @Override
@@ -143,7 +130,7 @@ public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatf
             this.fromApiJsonDeserializer.validateForUpdate(command.json());
 
             final Hook hook = retrieveHookBy(hookId);
-            final HookTemplate template = hook.getHookTemplate();
+            final HookTemplate template = hook.getTemplate();
             final Map<String, Object> changes = hook.update(command);
 
             if (!changes.isEmpty()) {
@@ -155,7 +142,7 @@ public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatf
                         changes.remove(templateIdParamName);
                         throw new TemplateNotFoundException(ugdTemplateId);
                     }
-                    hook.updateUgdTemplate(ugdTemplate);
+                    hook.setUgdTemplate(ugdTemplate);
                 }
 
                 if (changes.containsKey(eventsParamName)) {
@@ -224,7 +211,7 @@ public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatf
     private Set<HookConfiguration> assembleConfig(final Map<String, String> hookConfig, final HookTemplate template) {
 
         final Set<HookConfiguration> configuration = new HashSet<>();
-        final Set<Schema> fields = template.getSchema();
+        final Set<Schema> fields = template.getFields();
 
         for (final Map.Entry<String, String> configEntry : hookConfig.entrySet()) {
             for (final Schema field : fields) {
@@ -295,7 +282,7 @@ public class HookWritePlatformServiceJpaRepositoryImpl implements HookWritePlatf
             baseDataValidator.reset().failWithCodeNoParameterAddedToErrorCode(errorMessage);
         }
 
-        final Set<Schema> fields = template.getSchema();
+        final Set<Schema> fields = template.getFields();
         for (final Schema field : fields) {
             if (!field.isOptional()) {
                 boolean found = false;

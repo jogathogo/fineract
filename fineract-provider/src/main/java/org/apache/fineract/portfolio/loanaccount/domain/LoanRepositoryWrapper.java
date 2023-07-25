@@ -18,13 +18,16 @@
  */
 package org.apache.fineract.portfolio.loanaccount.domain;
 
+import com.google.common.collect.Lists;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.apache.fineract.infrastructure.core.config.FineractProperties;
+import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.portfolio.loanaccount.exception.LoanNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,14 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
  * </p>
  */
 @Service
+@RequiredArgsConstructor
 public class LoanRepositoryWrapper {
 
     private final LoanRepository repository;
-
-    @Autowired
-    public LoanRepositoryWrapper(final LoanRepository repository) {
-        this.repository = repository;
-    }
+    private final FineractProperties fineractProperties;
 
     @Transactional(readOnly = true)
     public Loan findOneWithNotFoundDetection(final Long id) {
@@ -62,8 +62,7 @@ public class LoanRepositoryWrapper {
     public Collection<Loan> findActiveLoansByLoanIdAndGroupId(Long clientId, Long groupId) {
         final Collection<Integer> loanStatuses = new ArrayList<>(Arrays.asList(LoanStatus.SUBMITTED_AND_PENDING_APPROVAL.getValue(),
                 LoanStatus.APPROVED.getValue(), LoanStatus.ACTIVE.getValue(), LoanStatus.OVERPAID.getValue()));
-        final Collection<Loan> loans = this.repository.findByClientIdAndGroupIdAndLoanStatus(clientId, groupId, loanStatuses);
-        return loans;
+        return this.repository.findByClientIdAndGroupIdAndLoanStatus(clientId, groupId, loanStatuses);
     }
 
     public Loan saveAndFlush(final Loan loan) {
@@ -88,13 +87,13 @@ public class LoanRepositoryWrapper {
     }
 
     // Only root entities is enough
-    public List<Loan> getGroupLoansDisbursedAfter(@Param("disbursementDate") Date disbursementDate, @Param("groupId") Long groupId,
+    public List<Loan> getGroupLoansDisbursedAfter(@Param("disbursementDate") LocalDate disbursementDate, @Param("groupId") Long groupId,
             @Param("loanType") Integer loanType) {
         return this.repository.getGroupLoansDisbursedAfter(disbursementDate, groupId, loanType);
     }
 
     // Only root entities enough
-    public List<Loan> getClientOrJLGLoansDisbursedAfter(@Param("disbursementDate") Date disbursementDate,
+    public List<Loan> getClientOrJLGLoansDisbursedAfter(@Param("disbursementDate") LocalDate disbursementDate,
             @Param("clientId") Long clientId) {
         return this.repository.getClientOrJLGLoansDisbursedAfter(disbursementDate, clientId);
     }
@@ -114,8 +113,7 @@ public class LoanRepositoryWrapper {
 
     public List<LoanRepaymentScheduleInstallment> getLoanRepaymentScheduleInstallments(final Long loanId) {
         final Loan loan = this.repository.findById(loanId).orElseThrow(() -> new LoanNotFoundException(loanId));
-        final List<LoanRepaymentScheduleInstallment> loanRepaymentScheduleInstallments = loan.getRepaymentScheduleInstallments();
-        return loanRepaymentScheduleInstallments;
+        return loan.getRepaymentScheduleInstallments();
     }
 
     public Integer getNumberOfRepayments(final Long loanId) {
@@ -167,7 +165,7 @@ public class LoanRepositoryWrapper {
         List<Loan> loans = this.repository.findLoanByClientId(clientId);
         if (loans != null && loans.size() > 0) {
             for (Loan loan : loans) {
-                loan.initilizeTransactions();
+                loan.initializeTransactions();
                 loan.initializeLoanOfficerHistory();
             }
         }
@@ -182,8 +180,11 @@ public class LoanRepositoryWrapper {
     // Looks like we need complete Data
     public List<Loan> findByIdsAndLoanStatusAndLoanType(@Param("ids") Collection<Long> ids,
             @Param("loanStatuses") Collection<Integer> loanStatuses, @Param("loanTypes") Collection<Integer> loanTypes) {
-        List<Loan> loans = this.repository.findByIdsAndLoanStatusAndLoanType(ids, loanStatuses, loanTypes);
-        if (loans != null && loans.size() > 0) {
+        List<Loan> loans = new ArrayList<>();
+        List<List<Long>> partitions = Lists.partition(ids.stream().toList(), fineractProperties.getQuery().getInClauseParameterSizeLimit());
+        partitions
+                .forEach(partition -> loans.addAll(this.repository.findByIdsAndLoanStatusAndLoanType(partition, loanStatuses, loanTypes)));
+        if (loans.size() > 0) {
             for (Loan loan : loans) {
                 loan.initializeLazyCollections();
             }
@@ -192,7 +193,7 @@ public class LoanRepositoryWrapper {
     }
 
     // This method is not used
-    public List<Long> getLoansDisbursedAfter(@Param("disbursalDate") Date disbursalDate) {
+    public List<Long> getLoansDisbursedAfter(@Param("disbursalDate") LocalDate disbursalDate) {
         return this.repository.getLoansDisbursedAfter(disbursalDate);
     }
 
@@ -240,13 +241,26 @@ public class LoanRepositoryWrapper {
         return this.repository.findNonClosedLoanByAccountNumber(accountNumber);
     }
 
+    public boolean existLoanByExternalId(final ExternalId externalId) {
+        return this.repository.existsByExternalId(externalId);
+    }
+
     // Looks like we need complete entity
     @Transactional(readOnly = true)
     public Loan findNonClosedLoanThatBelongsToClient(@Param("loanId") Long loanId, @Param("clientId") Long clientId) {
         Loan loan = this.repository.findNonClosedLoanThatBelongsToClient(loanId, clientId);
         if (loan != null) {
-            loan.initilizeTransactions();
+            loan.initializeTransactions();
         }
         return loan;
     }
+
+    public Long findIdByExternalId(ExternalId externalId) {
+        return this.repository.findIdByExternalId(externalId);
+    }
+
+    public List<Long> findLoanIdsByStatusId(Integer statusId) {
+        return repository.findLoanIdByStatusId(statusId);
+    }
+
 }

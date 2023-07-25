@@ -18,8 +18,10 @@
  */
 package org.apache.fineract.infrastructure.dataqueries.api;
 
+import com.google.gson.JsonObject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,20 +29,22 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.HashMap;
 import java.util.List;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
@@ -53,17 +57,14 @@ import org.apache.fineract.infrastructure.dataqueries.data.GenericResultsetData;
 import org.apache.fineract.infrastructure.dataqueries.service.GenericDataService;
 import org.apache.fineract.infrastructure.dataqueries.service.ReadWriteNonCoreDataService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/datatables")
+@Path("/v1/datatables")
 @Component
-@Scope("singleton")
 @Tag(name = "Data Tables", description = "The datatables API allows you to plug-in your own tables (MySql) that have a relationship to a Apache Fineract core table. For example, you might want to add some extra client fields and record information about each of the clients' family members. Via the API you can create, read, update and delete entries for each 'plugged-in' table. The API checks for permission and for 'data scoping' (only data within the users' office hierarchy can be managed by the user).\n"
         + "\n"
         + "The Apache Fineract Reference App uses a JQuery plug-in called stretchydatatables (which in turn uses this datatables resource) to provide a pretty flexible CRUD (Create, Read, Update, Delete) User Interface.")
+@RequiredArgsConstructor
 public class DatatablesApiResource {
 
     private final PlatformSecurityContext context;
@@ -71,19 +72,6 @@ public class DatatablesApiResource {
     private final ReadWriteNonCoreDataService readWriteNonCoreDataService;
     private final ToApiJsonSerializer<GenericResultsetData> toApiJsonSerializer;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
-    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(DatatablesApiResource.class);
-
-    @Autowired
-    public DatatablesApiResource(final PlatformSecurityContext context, final GenericDataService genericDataService,
-            final ReadWriteNonCoreDataService readWriteNonCoreDataService,
-            final ToApiJsonSerializer<GenericResultsetData> toApiJsonSerializer,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService) {
-        this.context = context;
-        this.genericDataService = genericDataService;
-        this.readWriteNonCoreDataService = readWriteNonCoreDataService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-    }
 
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -219,6 +207,25 @@ public class DatatablesApiResource {
     }
 
     @GET
+    @Path("{datatable}/query")
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Operation(summary = "Query Data Table values", description = "Query values from a registered data table.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = List.class))) })
+    public String queryValues(@PathParam("datatable") @Parameter(description = "datatable") final String datatable,
+            @QueryParam("columnFilter") @Parameter(description = "columnFilter") final String columnFilter,
+            @QueryParam("valueFilter") @Parameter(description = "valueFilter") final String valueFilter,
+            @QueryParam("resultColumns") @Parameter(description = "resultColumns") final String resultColumns,
+            @Context final UriInfo uriInfo) {
+        this.context.authenticatedUser().validateHasDatatableReadPermission(datatable);
+
+        final List<JsonObject> result = this.readWriteNonCoreDataService.queryDataTable(datatable, columnFilter, valueFilter,
+                resultColumns);
+
+        return this.toApiJsonSerializer.serializePretty(ApiParameterHelper.prettyPrint(uriInfo.getQueryParameters()), result);
+    }
+
+    @GET
     @Path("{datatable}/{apptableId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
@@ -257,9 +264,9 @@ public class DatatablesApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     public String getDatatableManyEntry(@PathParam("datatable") final String datatable, @PathParam("apptableId") final Long apptableId,
-            @PathParam("datatableId") final Long datatableId, @QueryParam("order") final String order, @Context final UriInfo uriInfo) {
-
-        LOG.debug("::1 we came in the getDatatbleManyEntry apiRessource method");
+            @PathParam("datatableId") final Long datatableId, @QueryParam("order") final String order,
+            @DefaultValue("false") @QueryParam("genericResultSet") @Parameter(in = ParameterIn.QUERY, name = "genericResultSet", description = "Optional flag to format the response", required = false) final boolean genericResultSet,
+            @Context final UriInfo uriInfo) {
 
         this.context.authenticatedUser().validateHasDatatableReadPermission(datatable);
 
@@ -267,7 +274,6 @@ public class DatatablesApiResource {
                 order, datatableId);
 
         String json = "";
-        final boolean genericResultSet = ApiParameterHelper.genericResultSet(uriInfo.getQueryParameters());
         if (genericResultSet) {
             final boolean prettyPrint = ApiParameterHelper.prettyPrint(uriInfo.getQueryParameters());
             json = this.toApiJsonSerializer.serializePretty(prettyPrint, results);
@@ -306,7 +312,7 @@ public class DatatablesApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Update Entry in Data Table (One to One)", description = "Updates the row (if it exists) of the data table.")
-    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = DatatablesApiResourceSwagger.PutDataTablesAppTableIdRequest.class)))
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = String.class)))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DatatablesApiResourceSwagger.PutDataTablesAppTableIdResponse.class))) })
     public String updateDatatableEntryOnetoOne(@PathParam("datatable") @Parameter(description = "datatable") final String datatable,
@@ -328,7 +334,7 @@ public class DatatablesApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Update Entry in Data Table (One to Many)", description = "Updates the row (if it exists) of the data table.")
-    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = DatatablesApiResourceSwagger.PutDataTablesAppTableIdDatatableIdRequest.class)))
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = String.class)))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DatatablesApiResourceSwagger.PutDataTablesAppTableIdDatatableIdResponse.class))) })
     public String updateDatatableEntryOneToMany(@PathParam("datatable") @Parameter(description = "datatable") final String datatable,

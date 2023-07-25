@@ -18,16 +18,15 @@
  */
 package org.apache.fineract.portfolio.shareaccounts.service;
 
+import jakarta.persistence.PersistenceException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.accounting.journalentry.service.JournalEntryWritePlatformService;
@@ -39,14 +38,11 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuilder;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
-import org.apache.fineract.organisation.monetary.data.CurrencyData;
-import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
+import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountApproveBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.portfolio.accounts.constants.ShareAccountApiConstants;
 import org.apache.fineract.portfolio.client.domain.AccountNumberGenerator;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEntity;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEvents;
-import org.apache.fineract.portfolio.common.service.BusinessEventNotifierService;
 import org.apache.fineract.portfolio.note.domain.Note;
 import org.apache.fineract.portfolio.note.domain.NoteRepository;
 import org.apache.fineract.portfolio.shareaccounts.data.ShareAccountTransactionEnumData;
@@ -106,8 +102,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
             journalEntryWritePlatformService.createJournalEntriesForShares(
                     populateJournalEntries(account, account.getPendingForApprovalSharePurchaseTransactions()));
 
-            this.businessEventNotifierService.notifyBusinessEventWasExecuted(BusinessEvents.SHARE_ACCOUNT_CREATE,
-                    constructEntityMap(BusinessEntity.SHARE_ACCOUNT, account));
+            businessEventNotifierService.notifyPostBusinessEvent(new ShareAccountCreateBusinessEvent(account));
 
             return new CommandProcessingResultBuilder() //
                     .withCommandId(jsonCommand.commandId()) //
@@ -133,16 +128,13 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
 
     private Map<String, Object> populateJournalEntries(final ShareAccount account, final Set<ShareAccountTransaction> transactions) {
         final Map<String, Object> accountingBridgeData = new HashMap<>();
-        Boolean cashBasedAccounting = account.getShareProduct().getAccountingType().intValue() == 2 ? Boolean.TRUE : Boolean.FALSE;
+        Boolean cashBasedAccounting = account.getShareProduct().getAccountingType() == 2 ? Boolean.TRUE : Boolean.FALSE;
         accountingBridgeData.put("cashBasedAccountingEnabled", cashBasedAccounting);
         accountingBridgeData.put("accrualBasedAccountingEnabled", Boolean.FALSE);
         accountingBridgeData.put("shareAccountId", account.getId());
         accountingBridgeData.put("shareProductId", account.getShareProduct().getId());
         accountingBridgeData.put("officeId", account.getOfficeId());
-        MonetaryCurrency currency = account.getCurrency();
-        final CurrencyData currencyData = new CurrencyData(currency.getCode(), "", currency.getDigitsAfterDecimal(),
-                currency.getCurrencyInMultiplesOf(), "", "");
-        accountingBridgeData.put("currency", currencyData);
+        accountingBridgeData.put("currencyCode", account.getCurrency().getCode());
         final List<Map<String, Object>> newTransactionsMap = new ArrayList<>();
         accountingBridgeData.put("newTransactions", newTransactionsMap);
 
@@ -150,8 +142,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
             final Map<String, Object> transactionDto = new HashMap<>();
             transactionDto.put("officeId", account.getOfficeId());
             transactionDto.put("id", transaction.getId());
-            transactionDto.put("date",
-                    LocalDate.ofInstant(transaction.getPurchasedDate().toInstant(), DateUtils.getDateTimeZoneOfTenant()));
+            transactionDto.put("date", transaction.getPurchasedDate());
             final Integer status = transaction.getTransactionStatus();
             final ShareAccountTransactionEnumData statusEnum = new ShareAccountTransactionEnumData(status.longValue(), null, null);
             final Integer type = transaction.getTransactionType();
@@ -192,7 +183,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
     @Override
     public CommandProcessingResult updateShareAccount(Long accountId, JsonCommand jsonCommand) {
         try {
-            Date transactionDate = DateUtils.getDateOfTenant();
+            LocalDate transactionDate = DateUtils.getBusinessLocalDate();
             ShareAccount account = this.shareAccountRepository.findOneWithNotFoundDetection(accountId);
             Map<String, Object> changes = this.accountDataSerializer.validateAndUpdate(jsonCommand, account);
             if (!changes.isEmpty()) {
@@ -229,7 +220,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
             Map<String, Object> changes = this.accountDataSerializer.validateAndApplyAddtionalShares(jsonCommand, account);
             ShareAccountTransaction transaction = null;
             if (!changes.isEmpty()) {
-                this.shareAccountRepository.save(account);
+                this.shareAccountRepository.saveAndFlush(account);
                 transaction = (ShareAccountTransaction) changes.get(ShareAccountApiConstants.additionalshares_paramname);
                 transaction = account.getShareAccountTransaction(transaction);
                 if (transaction != null) {
@@ -283,8 +274,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
 
             this.journalEntryWritePlatformService.createJournalEntriesForShares(populateJournalEntries(account, journalTransactions));
 
-            this.businessEventNotifierService.notifyBusinessEventWasExecuted(BusinessEvents.SHARE_ACCOUNT_APPROVE,
-                    constructEntityMap(BusinessEntity.SHARE_ACCOUNT, account));
+            businessEventNotifierService.notifyPostBusinessEvent(new ShareAccountApproveBusinessEvent(account));
 
             return new CommandProcessingResultBuilder() //
                     .withCommandId(jsonCommand.commandId()) //
@@ -353,7 +343,7 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
                     journalEntryTransactions.add(transaction.getId());
                 }
             }
-            Date transactionDate = DateUtils.getDateOfTenant();
+            LocalDate transactionDate = DateUtils.getBusinessLocalDate();
             this.journalEntryWritePlatformService.revertShareAccountJournalEntries(journalEntryTransactions, transactionDate);
             journalEntryWritePlatformService.createJournalEntriesForShares(
                     populateJournalEntries(account, account.getPendingForApprovalSharePurchaseTransactions()));
@@ -529,12 +519,5 @@ public class ShareAccountWritePlatformServiceJpaRepositoryImpl implements ShareA
     private void handleDataIntegrityIssues(final JsonCommand command, final Throwable realCause, final Exception dve) {
         throw new PlatformDataIntegrityException("error.msg.shareaccount.unknown.data.integrity.issue",
                 "Unknown data integrity issue with resource.");
-    }
-
-    private Map<BusinessEventNotificationConstants.BusinessEntity, Object> constructEntityMap(
-            final BusinessEventNotificationConstants.BusinessEntity entityEvent, Object entity) {
-        Map<BusinessEventNotificationConstants.BusinessEntity, Object> map = new HashMap<>(1);
-        map.put(entityEvent, entity);
-        return map;
     }
 }

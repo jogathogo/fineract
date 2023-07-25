@@ -22,11 +22,11 @@ import static org.apache.fineract.organisation.holiday.api.HolidayApiConstants.o
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import jakarta.persistence.PersistenceException;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
@@ -115,7 +115,7 @@ public class HolidayWritePlatformServiceJpaRepositoryImpl implements HolidayWrit
             final Holiday holiday = this.holidayRepository.findOneWithNotFoundDetection(command.entityId());
             Map<String, Object> changes = holiday.update(command);
 
-            validateInputDates(holiday.getFromDateLocalDate(), holiday.getToDateLocalDate(), holiday.getRepaymentsRescheduledToLocalDate());
+            validateInputDates(holiday.getFromDate(), holiday.getToDate(), holiday.getRepaymentsRescheduledTo());
 
             if (changes.containsKey(officesParamName)) {
                 final Set<Office> offices = getSelectedOffices(command);

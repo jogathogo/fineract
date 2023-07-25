@@ -28,22 +28,23 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
@@ -58,29 +59,33 @@ import org.apache.fineract.useradministration.data.RoleData;
 import org.apache.fineract.useradministration.data.RolePermissionsData;
 import org.apache.fineract.useradministration.service.PermissionReadPlatformService;
 import org.apache.fineract.useradministration.service.RoleReadPlatformService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/roles")
+@Path("/v1/roles")
 @Component
-@Scope("singleton")
 @Tag(name = "Roles", description = "An API capability to support management of application roles for user administration.")
+@RequiredArgsConstructor
 public class RolesApiResource {
 
+    public static final String ID = "id";
+    public static final String NAME = "name";
+    public static final String DESCRIPTION = "description";
+    public static final String AVAILABLE_PERMISSIONS = "availablePermissions";
+    public static final String SELECTED_PERMISSIONS = "selectedPermissions";
+    public static final String PERMISSION_USAGE_DATA = "permissionUsageData";
+    public static final String DISABLE = "disable";
+    public static final String ENABLE = "enable";
     /**
      * The set of parameters that are supported in response for {@link RoleData}
      */
-    private final Set<String> responseDataParameters = new HashSet<>(
-            Arrays.asList("id", "name", "description", "availablePermissions", "selectedPermissions"));
-
+    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(
+            Arrays.asList(ID, NAME, DESCRIPTION, AVAILABLE_PERMISSIONS, SELECTED_PERMISSIONS));
     /**
      * The set of parameters that are supported in response for {@link RoleData}
      */
-    private final Set<String> permissionsResponseParameters = new HashSet<>(
-            Arrays.asList("id", "name", "description", "permissionUsageData"));
-
-    private final String resourceNameForPermissions = "ROLE";
+    private static final Set<String> PERMISSIONS_RESPONSE_PARAMETERS = new HashSet<>(
+            Arrays.asList(ID, NAME, DESCRIPTION, PERMISSION_USAGE_DATA));
+    private static final String RESOURCE_NAME_FOR_PERMISSIONS = "ROLE";
 
     private final PlatformSecurityContext context;
     private final RoleReadPlatformService roleReadPlatformService;
@@ -90,22 +95,6 @@ public class RolesApiResource {
     private final ApiRequestParameterHelper apiRequestParameterHelper;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
 
-    @Autowired
-    public RolesApiResource(final PlatformSecurityContext context, final RoleReadPlatformService readPlatformService,
-            final PermissionReadPlatformService permissionReadPlatformService,
-            final DefaultToApiJsonSerializer<RoleData> toApiJsonSerializer,
-            final DefaultToApiJsonSerializer<RolePermissionsData> permissionsToApiJsonSerializer,
-            final ApiRequestParameterHelper apiRequestParameterHelper,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService) {
-        this.context = context;
-        this.roleReadPlatformService = readPlatformService;
-        this.permissionReadPlatformService = permissionReadPlatformService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.permissionsToApiJsonSerializer = permissionsToApiJsonSerializer;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-    }
-
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
@@ -114,12 +103,12 @@ public class RolesApiResource {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = RolesApiResourceSwagger.GetRolesResponse.class)))) })
     public String retrieveAllRoles(@Context final UriInfo uriInfo) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final Collection<RoleData> roles = this.roleReadPlatformService.retrieveAll();
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, roles, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, roles, RESPONSE_DATA_PARAMETERS);
     }
 
     @POST
@@ -150,13 +139,13 @@ public class RolesApiResource {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = RolesApiResourceSwagger.GetRolesRoleIdResponse.class))) })
     public String retrieveRole(@PathParam("roleId") @Parameter(description = "roleId") final Long roleId, @Context final UriInfo uriInfo) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
 
         final RoleData role = this.roleReadPlatformService.retrieveOne(roleId);
 
-        return this.toApiJsonSerializer.serialize(settings, role, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, role, RESPONSE_DATA_PARAMETERS);
     }
 
     /**
@@ -185,10 +174,10 @@ public class RolesApiResource {
 
         CommandProcessingResult result = null;
 
-        if (is(commandParam, "disable")) {
+        if (is(commandParam, DISABLE)) {
             final CommandWrapper commandRequest = builder.disableRole(roleId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
-        } else if (is(commandParam, "enable")) {
+        } else if (is(commandParam, ENABLE)) {
             final CommandWrapper commandRequest = builder.enableRole(roleId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
         }
@@ -226,14 +215,14 @@ public class RolesApiResource {
     public String retrieveRolePermissions(@PathParam("roleId") @Parameter(description = "roleId") final Long roleId,
             @Context final UriInfo uriInfo) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
 
         final RoleData role = this.roleReadPlatformService.retrieveOne(roleId);
         final Collection<PermissionData> permissionUsageData = this.permissionReadPlatformService.retrieveAllRolePermissions(roleId);
         final RolePermissionsData permissionsData = role.toRolePermissionData(permissionUsageData);
-        return this.permissionsToApiJsonSerializer.serialize(settings, permissionsData, this.permissionsResponseParameters);
+        return this.permissionsToApiJsonSerializer.serialize(settings, permissionsData, PERMISSIONS_RESPONSE_PARAMETERS);
     }
 
     @PUT

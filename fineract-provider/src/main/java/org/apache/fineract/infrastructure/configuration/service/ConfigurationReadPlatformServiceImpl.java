@@ -18,9 +18,10 @@
  */
 package org.apache.fineract.infrastructure.configuration.service;
 
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import org.apache.fineract.infrastructure.configuration.data.GlobalConfigurationData;
 import org.apache.fineract.infrastructure.configuration.data.GlobalConfigurationPropertyData;
@@ -63,7 +64,7 @@ public class ConfigurationReadPlatformServiceImpl implements ConfigurationReadPl
         final List<GlobalConfigurationPropertyData> globalConfiguration = this.jdbcTemplate.query(sql, this.rm,
                 survey ? new Object[] { DataTableApiConstant.CATEGORY_PPI } : new Object[] {});
 
-        return new GlobalConfigurationData(globalConfiguration);
+        return new GlobalConfigurationData().setGlobalConfiguration(globalConfiguration);
     }
 
     @Override
@@ -105,7 +106,9 @@ public class ConfigurationReadPlatformServiceImpl implements ConfigurationReadPl
             final String description = rs.getString("description");
             final Long id = rs.getLong("id");
             final boolean isTrapDoor = rs.getBoolean("is_trap_door");
-            return new GlobalConfigurationPropertyData(name, enabled, value, dateValue, stringValue, id, description, isTrapDoor);
+            final LocalDate localDate = dateValue != null ? dateValue.toLocalDate() : null;
+            return new GlobalConfigurationPropertyData().setName(name).setEnabled(enabled).setValue(value).setDateValue(localDate)
+                    .setStringValue(stringValue).setId(id).setDescription(description).setTrapDoor(isTrapDoor);
         }
     }
 

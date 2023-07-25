@@ -21,11 +21,11 @@ package org.apache.fineract.organisation.provisioning.service;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import jakarta.persistence.PersistenceException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.accounting.glaccount.domain.GLAccount;
 import org.apache.fineract.accounting.glaccount.domain.GLAccountRepository;
@@ -153,9 +153,12 @@ public class ProvisioningCriteriaWritePlatformServiceJpaRepositoryImpl implement
             String categoryName = null;
             String liabilityAccountName = null;
             String expenseAccountName = null;
-            ProvisioningCriteriaDefinitionData data = new ProvisioningCriteriaDefinitionData(id, categoryId, categoryName, minimumAge,
-                    maximumAge, provisioningpercentage, liabilityAccount.getId(), liabilityAccount.getGlCode(), liabilityAccountName,
-                    expenseAccount.getId(), expenseAccount.getGlCode(), expenseAccountName);
+            ProvisioningCriteriaDefinitionData data = new ProvisioningCriteriaDefinitionData().setId(id).setCategoryId(categoryId)
+                    .setCategoryName(categoryName).setMinAge(minimumAge).setMaxAge(maximumAge)
+                    .setProvisioningPercentage(provisioningpercentage).setLiabilityAccount(liabilityAccount.getId())
+                    .setLiabilityCode(liabilityAccount.getGlCode()).setLiabilityName(liabilityAccountName)
+                    .setExpenseAccount(expenseAccount.getId()).setExpenseCode(expenseAccount.getGlCode())
+                    .setExpenseName(expenseAccountName);
             provisioningCriteria.update(data, liabilityAccount, expenseAccount);
         }
     }

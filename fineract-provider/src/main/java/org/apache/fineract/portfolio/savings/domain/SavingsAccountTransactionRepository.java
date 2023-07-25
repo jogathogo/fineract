@@ -18,28 +18,40 @@
  */
 package org.apache.fineract.portfolio.savings.domain;
 
-import java.util.Date;
+import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
-import javax.persistence.LockModeType;
+import org.apache.fineract.portfolio.savings.domain.search.SavingsTransactionsSearchRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface SavingsAccountTransactionRepository
-        extends JpaRepository<SavingsAccountTransaction, Long>, JpaSpecificationExecutor<SavingsAccountTransaction> {
+public interface SavingsAccountTransactionRepository extends JpaRepository<SavingsAccountTransaction, Long>,
+        JpaSpecificationExecutor<SavingsAccountTransaction>, SavingsTransactionsSearchRepository {
 
     @Query("select sat from SavingsAccountTransaction sat where sat.id = :transactionId and sat.savingsAccount.id = :savingsId")
     SavingsAccountTransaction findOneByIdAndSavingsAccountId(@Param("transactionId") Long transactionId,
             @Param("savingsId") Long savingsId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select st from SavingsAccountTransaction st where st.savingsAccount = :savingsAccount and st.dateOf >= :date order by st.dateOf,st.createdDate,st.id")
+    @Query("select st from SavingsAccountTransaction st where st.savingsAccount = :savingsAccount and st.dateOf >= :transactionDate order by st.dateOf,st.createdDate,st.id")
     List<SavingsAccountTransaction> findTransactionsAfterPivotDate(@Param("savingsAccount") SavingsAccount savingsAccount,
-            @Param("date") Date date);
+            @Param("transactionDate") LocalDate transactionDate);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select st from SavingsAccountTransaction st where st.savingsAccount = :savingsAccount and st.dateOf = :date and st.reversalTransaction <> 1 and st.reversed <> 1 order by st.id")
+    List<SavingsAccountTransaction> findTransactionRunningBalanceBeforePivotDate(@Param("savingsAccount") SavingsAccount savingsAccount,
+            @Param("date") LocalDate date);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<SavingsAccountTransaction> findBySavingsAccount(@Param("savingsAccount") SavingsAccount savingsAccount);
 
+    List<SavingsAccountTransaction> findByRefNo(@Param("refNo") String refNo);
+
+    @Query("select sat from SavingsAccountTransaction sat where sat.savingsAccount.id = :savingsId and sat.dateOf <= :transactionDate and sat.reversed=false")
+    List<SavingsAccountTransaction> findBySavingsAccountIdAndLessThanDateOfAndReversedIsFalse(@Param("savingsId") Long savingsId,
+            @Param("transactionDate") LocalDate transactionDate, Pageable pageable);
 }

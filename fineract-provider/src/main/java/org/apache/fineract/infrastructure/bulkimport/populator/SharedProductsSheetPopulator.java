@@ -19,8 +19,8 @@
 package org.apache.fineract.infrastructure.bulkimport.populator;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,9 +76,9 @@ public class SharedProductsSheetPopulator extends AbstractWorkbookPopulator {
             writeLong(PRODUCT_ID, row, productData.getId());
             writeString(PRODUCT_NAME_COL, row, productData.getName().replaceAll("[ ]", "_"));
             writeString(CURRENCY_COL, row, productData.getCurrency().getName().replaceAll("[ ]", "_"));
-            writeInt(DECIMAL_PLACES_COL, row, productData.getCurrency().decimalPlaces());
+            writeInt(DECIMAL_PLACES_COL, row, productData.getCurrency().getDecimalPlaces());
             writeBigDecimal(TODAYS_PRICE_COL, row, deriveMarketPrice(productData));
-            writeInt(CURRENCY_IN_MULTIPLES_COL, row, productData.getCurrency().currencyInMultiplesOf());
+            writeInt(CURRENCY_IN_MULTIPLES_COL, row, productData.getCurrency().getInMultiplesOf());
             if (chargesForSharedProducts != null) {
                 int chargeRowIndex = 0;
                 for (ChargeData chargeData : chargesForSharedProducts) {
@@ -99,10 +99,10 @@ public class SharedProductsSheetPopulator extends AbstractWorkbookPopulator {
         BigDecimal marketValue = shareProductData.getUnitPrice();
         Collection<ShareProductMarketPriceData> marketDataSet = shareProductData.getMarketPrice();
         if (marketDataSet != null && !marketDataSet.isEmpty()) {
-            Date currentDate = DateUtils.getDateOfTenant();
+            LocalDate currentDate = DateUtils.getBusinessLocalDate();
             for (ShareProductMarketPriceData data : marketDataSet) {
-                Date futureDate = data.getStartDate();
-                if (currentDate.after(futureDate)) {
+                LocalDate futureDate = data.getFromDate();
+                if (currentDate.isAfter(futureDate)) {
                     marketValue = data.getShareValue();
                 }
             }

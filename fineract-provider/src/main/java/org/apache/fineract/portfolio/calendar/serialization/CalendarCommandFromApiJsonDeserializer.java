@@ -22,7 +22,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +50,7 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
     /**
      * The parameters supported for this command.
      */
-    private final Set<String> supportedParameters = CalendarSupportedParameters.getAllValues();
+    private static final Set<String> SUPPORTED_PARAMETERS = CalendarSupportedParameters.getAllValues();
 
     private final FromJsonHelper fromApiJsonHelper;
 
@@ -66,7 +66,7 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
         }
 
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
-        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, this.supportedParameters);
+        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, SUPPORTED_PARAMETERS);
 
         final JsonElement element = this.fromApiJsonHelper.parse(json);
         final String title = this.fromApiJsonHelper.extractStringNamed(CalendarSupportedParameters.TITLE.getValue(), element);
@@ -100,7 +100,7 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
         }
 
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
-        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, this.supportedParameters);
+        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, SUPPORTED_PARAMETERS);
         final JsonElement element = this.fromApiJsonHelper.parse(json);
 
         final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
@@ -203,8 +203,8 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
                     .integerGreaterThanZero();
         }
         if (this.fromApiJsonHelper.parameterExists(CalendarSupportedParameters.MEETING_TIME.getValue(), element)) {
-            final LocalDateTime meetingTime = this.fromApiJsonHelper
-                    .extractLocalTimeNamed(CalendarSupportedParameters.MEETING_TIME.getValue(), element);
+            final LocalTime meetingTime = this.fromApiJsonHelper.extractLocalTimeNamed(CalendarSupportedParameters.MEETING_TIME.getValue(),
+                    element);
             baseDataValidator.reset().parameter(CalendarSupportedParameters.MEETING_TIME.getValue()).value(meetingTime).ignoreIfNull();
         }
 
@@ -221,7 +221,7 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
         }
 
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
-        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, this.supportedParameters);
+        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, SUPPORTED_PARAMETERS);
         final JsonElement element = this.fromApiJsonHelper.parse(json);
 
         final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
@@ -347,9 +347,9 @@ public class CalendarCommandFromApiJsonDeserializer extends AbstractFromApiJsonD
                     .ignoreIfNull();
         }
         if (this.fromApiJsonHelper.parameterExists(CalendarSupportedParameters.MEETING_TIME.getValue(), element)) {
-            final LocalDateTime startDate = this.fromApiJsonHelper
-                    .extractLocalTimeNamed(CalendarSupportedParameters.MEETING_TIME.getValue(), element);
-            baseDataValidator.reset().parameter(CalendarSupportedParameters.MEETING_TIME.getValue()).value(startDate).ignoreIfNull();
+            final LocalTime meetingTime = this.fromApiJsonHelper.extractLocalTimeNamed(CalendarSupportedParameters.MEETING_TIME.getValue(),
+                    element);
+            baseDataValidator.reset().parameter(CalendarSupportedParameters.MEETING_TIME.getValue()).value(meetingTime).ignoreIfNull();
         }
 
         if (!dataValidationErrors.isEmpty()) {

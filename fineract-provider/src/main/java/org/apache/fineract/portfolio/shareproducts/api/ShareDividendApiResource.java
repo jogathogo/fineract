@@ -19,16 +19,17 @@
 package org.apache.fineract.portfolio.shareproducts.api;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
@@ -43,39 +44,22 @@ import org.apache.fineract.portfolio.shareaccounts.data.ShareAccountDividendData
 import org.apache.fineract.portfolio.shareaccounts.service.ShareAccountDividendReadPlatformService;
 import org.apache.fineract.portfolio.shareproducts.data.ShareProductDividendPayOutData;
 import org.apache.fineract.portfolio.shareproducts.service.ShareProductDividendReadPlatformService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/shareproduct/{productId}/dividend")
+@Path("/v1/shareproduct/{productId}/dividend")
 @Component
-@Scope("singleton")
-
 @Tag(name = "Self Dividend", description = "")
+@RequiredArgsConstructor
 public class ShareDividendApiResource {
 
+    public static final String APPROVE = "approve";
+    private static final String RESOURCE_NAME_FOR_PERMISSIONS = "DIVIDEND_SHAREPRODUCT";
     private final DefaultToApiJsonSerializer<ShareProductDividendPayOutData> toApiJsonSerializer;
     private final DefaultToApiJsonSerializer<ShareAccountDividendData> toApiAccountDetailJsonSerializer;
     private final PlatformSecurityContext platformSecurityContext;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
     private final ShareAccountDividendReadPlatformService shareAccountDividendReadPlatformService;
     private final ShareProductDividendReadPlatformService shareProductDividendReadPlatformService;
-    private final String resourceNameForPermissions = "DIVIDEND_SHAREPRODUCT";
-
-    @Autowired
-    public ShareDividendApiResource(final DefaultToApiJsonSerializer<ShareProductDividendPayOutData> toApiJsonSerializer,
-            final PlatformSecurityContext platformSecurityContext,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService,
-            final DefaultToApiJsonSerializer<ShareAccountDividendData> toApiDividendsJsonSerializer,
-            final ShareAccountDividendReadPlatformService shareAccountDividendReadPlatformService,
-            final ShareProductDividendReadPlatformService shareProductDividendReadPlatformService) {
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.platformSecurityContext = platformSecurityContext;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-        this.toApiAccountDetailJsonSerializer = toApiDividendsJsonSerializer;
-        this.shareAccountDividendReadPlatformService = shareAccountDividendReadPlatformService;
-        this.shareProductDividendReadPlatformService = shareProductDividendReadPlatformService;
-    }
 
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -84,7 +68,7 @@ public class ShareDividendApiResource {
             @QueryParam("limit") final Integer limit, @QueryParam("orderBy") final String orderBy,
             @QueryParam("sortOrder") final String sortOrder, @QueryParam("status") final Integer status) {
 
-        this.platformSecurityContext.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.platformSecurityContext.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         final SearchParameters searchParameters = SearchParameters.forPagination(offset, limit, orderBy, sortOrder);
         Page<ShareProductDividendPayOutData> dividendPayoutDetails = this.shareProductDividendReadPlatformService.retriveAll(productId,
                 status, searchParameters);
@@ -100,7 +84,7 @@ public class ShareDividendApiResource {
             @QueryParam("sortOrder") final String sortOrder, @QueryParam("accountNo") final String accountNo,
             @PathParam("productId") final Long productId) {
 
-        this.platformSecurityContext.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.platformSecurityContext.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         final SearchParameters searchParameters = SearchParameters.forPaginationAndAccountNumberSearch(offset, limit, orderBy, sortOrder,
                 accountNo);
         Page<ShareAccountDividendData> dividendDetails = this.shareAccountDividendReadPlatformService.retriveAll(dividendId,
@@ -125,9 +109,9 @@ public class ShareDividendApiResource {
     @Produces({ MediaType.APPLICATION_JSON })
     public String updateDividendDetail(@PathParam("productId") final Long productId, @PathParam("dividendId") final Long dividendId,
             @QueryParam("command") final String commandParam, final String apiRequestBodyAsJson) {
-        CommandWrapper commandWrapper = null;
+        CommandWrapper commandWrapper;
         this.platformSecurityContext.authenticatedUser();
-        if (is(commandParam, "approve")) {
+        if (is(commandParam, APPROVE)) {
             commandWrapper = new CommandWrapperBuilder().approveShareProductDividendPayoutCommand(productId, dividendId)
                     .withJson(apiRequestBodyAsJson).build();
         } else {

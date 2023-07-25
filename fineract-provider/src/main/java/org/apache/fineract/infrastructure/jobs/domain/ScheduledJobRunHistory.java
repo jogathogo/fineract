@@ -18,18 +18,26 @@
  */
 package org.apache.fineract.infrastructure.jobs.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 import java.util.Date;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 
 @Entity
 @Table(name = "job_run_history")
+@Getter
+@Setter
+@NoArgsConstructor
+@Accessors(chain = true)
 public class ScheduledJobRunHistory extends AbstractPersistableCustom {
 
     @ManyToOne
@@ -58,10 +66,6 @@ public class ScheduledJobRunHistory extends AbstractPersistableCustom {
 
     @Column(name = "error_log")
     private String errorLog;
-
-    public ScheduledJobRunHistory() {
-
-    }
 
     public ScheduledJobRunHistory(final ScheduledJobDetail scheduledJobDetail, final Long version, final Date startTime, final Date endTime,
             final String status, final String errorMessage, final String triggerType, final String errorLog) {

@@ -20,43 +20,34 @@ package org.apache.fineract.infrastructure.campaigns.email.service;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.campaigns.email.data.EmailData;
 import org.apache.fineract.infrastructure.campaigns.email.domain.EmailMessageEnumerations;
 import org.apache.fineract.infrastructure.campaigns.email.domain.EmailMessageStatusType;
 import org.apache.fineract.infrastructure.campaigns.email.exception.EmailNotFoundException;
 import org.apache.fineract.infrastructure.core.data.EnumOptionData;
 import org.apache.fineract.infrastructure.core.domain.JdbcSupport;
+import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.Page;
 import org.apache.fineract.infrastructure.core.service.PaginationHelper;
 import org.apache.fineract.infrastructure.core.service.SearchParameters;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class EmailReadPlatformServiceImpl implements EmailReadPlatformService {
 
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseSpecificSQLGenerator sqlGenerator;
     private final EmailMapper emailRowMapper = new EmailMapper();
     private final PaginationHelper paginationHelper;
-
-    @Autowired
-    public EmailReadPlatformServiceImpl(final JdbcTemplate jdbcTemplate, DatabaseSpecificSQLGenerator sqlGenerator,
-            PaginationHelper paginationHelper) {
-        this.jdbcTemplate = jdbcTemplate;
-        this.sqlGenerator = sqlGenerator;
-        this.paginationHelper = paginationHelper;
-    }
 
     private static final class EmailMapper implements RowMapper<EmailData> {
 
@@ -172,7 +163,8 @@ public class EmailReadPlatformServiceImpl implements EmailReadPlatformService {
     }
 
     @Override
-    public Page<EmailData> retrieveEmailByStatus(final Integer limit, final Integer status, final Date dateFrom, final Date dateTo) {
+    public Page<EmailData> retrieveEmailByStatus(final Integer limit, final Integer status, final LocalDate dateFrom,
+            final LocalDate dateTo) {
         final StringBuilder sqlBuilder = new StringBuilder(200);
         sqlBuilder.append("select " + sqlGenerator.calcFoundRows() + " ");
         sqlBuilder.append(this.emailRowMapper.schema());
@@ -182,9 +174,8 @@ public class EmailReadPlatformServiceImpl implements EmailReadPlatformService {
         String fromDateString = null;
         String toDateString = null;
         if (dateFrom != null && dateTo != null) {
-            final DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-            fromDateString = df.format(dateFrom);
-            toDateString = df.format(dateTo);
+            fromDateString = DateUtils.DEFAULT_DATE_FORMATTER.format(dateFrom);
+            toDateString = DateUtils.DEFAULT_DATE_FORMATTER.format(dateTo);
             sqlBuilder.append(" and emo.submittedon_date >= ? and emo.submittedon_date <= ? ");
         }
         final String sqlPlusLimit = (limit > 0) ? " " + sqlGenerator.limit(limit) : "";

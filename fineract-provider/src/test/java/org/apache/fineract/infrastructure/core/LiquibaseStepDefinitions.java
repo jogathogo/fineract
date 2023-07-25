@@ -19,16 +19,16 @@
 package org.apache.fineract.infrastructure.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import io.cucumber.java8.En;
+import java.util.Arrays;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.fineract.infrastructure.core.config.FineractProperties;
@@ -39,8 +39,11 @@ import org.apache.fineract.infrastructure.core.service.migration.SchemaUpgradeNe
 import org.apache.fineract.infrastructure.core.service.migration.TenantDataSourceFactory;
 import org.apache.fineract.infrastructure.core.service.migration.TenantDatabaseStateVerifier;
 import org.apache.fineract.infrastructure.core.service.migration.TenantDatabaseUpgradeService;
-import org.apache.fineract.infrastructure.security.service.TenantDetailsService;
+import org.apache.fineract.infrastructure.core.service.migration.TenantPasswordEncryptionTask;
+import org.apache.fineract.infrastructure.core.service.tenant.TenantDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.mock.env.MockEnvironment;
 
 public class LiquibaseStepDefinitions implements En {
 
@@ -54,12 +57,14 @@ public class LiquibaseStepDefinitions implements En {
     private ExtendedSpringLiquibase tenantStoreLiquibase;
     private ExtendedSpringLiquibase initialTenantLiquibase;
     private ExtendedSpringLiquibase tenantLiquibase;
+    private ExtendedSpringLiquibase customChangeLogLiquibase;
     private FineractPlatformTenant defaultTenant;
     private DataSource tenantStoreDataSource;
     private TenantDatabaseUpgradeService tenantDatabaseUpgradeService;
     private List<FineractPlatformTenant> allTenants;
     private SchemaUpgradeNeededException executionException;
     private DataSource defaultTenantDataSource;
+    private Environment environment;
 
     public LiquibaseStepDefinitions() {
         Given("Liquibase is disabled with a default tenant", () -> {
@@ -113,15 +118,16 @@ public class LiquibaseStepDefinitions implements En {
 
         Then("The tenant store upgrade fails with a schema upgrade needed", () -> {
             assertThat(executionException).isNotNull();
-            verify(liquibaseFactory).create(eq(tenantStoreDataSource), any());
+            verify(liquibaseFactory).create(eq(tenantStoreDataSource), anyString(), anyString());
             verifyNoMoreInteractions(liquibaseFactory);
             verifyNoInteractions(initialTenantStoreLiquibase, tenantStoreLiquibase, initialTenantLiquibase, tenantLiquibase);
         });
 
         Then("The default tenant upgrade fails with a schema upgrade needed", () -> {
             assertThat(executionException).isNotNull();
-            verify(liquibaseFactory, times(2)).create(eq(tenantStoreDataSource), any());
-            verify(liquibaseFactory).create(eq(defaultTenantDataSource), any());
+            verify(liquibaseFactory).create(eq(tenantStoreDataSource), anyString(), anyString());
+            verify(liquibaseFactory).create(eq(tenantStoreDataSource), anyString());
+            verify(liquibaseFactory).create(eq(defaultTenantDataSource), anyString(), anyString(), anyString());
             verifyNoMoreInteractions(liquibaseFactory);
             verify(initialTenantStoreLiquibase).changeLogSync();
             verify(tenantStoreLiquibase).afterPropertiesSet();
@@ -147,10 +153,12 @@ public class LiquibaseStepDefinitions implements En {
         tenantDataSourceFactory = mock(TenantDataSourceFactory.class);
         tenantDetailsService = mock(TenantDetailsService.class);
         databaseStateVerifier = mock(TenantDatabaseStateVerifier.class);
+        environment = new MockEnvironment();
 
         liquibaseFactory = mock(ExtendedSpringLiquibaseFactory.class);
 
         defaultTenant = mock(FineractPlatformTenant.class);
+        given(defaultTenant.getTenantIdentifier()).willReturn("defaultTenant");
 
         allTenants = List.of(defaultTenant);
 
@@ -158,10 +166,13 @@ public class LiquibaseStepDefinitions implements En {
 
         initialTenantLiquibase = mock(ExtendedSpringLiquibase.class);
         tenantLiquibase = mock(ExtendedSpringLiquibase.class);
+        customChangeLogLiquibase = mock(ExtendedSpringLiquibase.class);
         initialTenantStoreLiquibase = mock(ExtendedSpringLiquibase.class);
         tenantStoreLiquibase = mock(ExtendedSpringLiquibase.class);
 
         defaultTenantDataSource = mock(DataSource.class);
+
+        TenantPasswordEncryptionTask tenantPasswordEncryptor = mock(TenantPasswordEncryptionTask.class);
 
         given(databaseStateVerifier.isLiquibaseDisabled()).willReturn(!liquibaseEnabled);
         given(liquibaseFactory.create(tenantStoreDataSource, "tenant_store_db", "initial_switch")).willReturn(initialTenantStoreLiquibase);
@@ -169,10 +180,13 @@ public class LiquibaseStepDefinitions implements En {
 
         given(tenantDetailsService.findAllTenants()).willReturn(allTenants);
         given(tenantDataSourceFactory.create(defaultTenant)).willReturn(defaultTenantDataSource);
-        given(liquibaseFactory.create(defaultTenantDataSource, "tenant_db", "initial_switch")).willReturn(initialTenantLiquibase);
-        given(liquibaseFactory.create(defaultTenantDataSource, "tenant_db")).willReturn(tenantLiquibase);
+        given(liquibaseFactory.create(defaultTenantDataSource, "tenant_db", "initial_switch", "defaultTenant"))
+                .willReturn(initialTenantLiquibase);
+        given(liquibaseFactory.create(defaultTenantDataSource, "tenant_db", "defaultTenant")).willReturn(tenantLiquibase);
+        given(liquibaseFactory.create(defaultTenantDataSource, "tenant_db", "custom_changelog", "defaultTenant"))
+                .willReturn(customChangeLogLiquibase);
 
         tenantDatabaseUpgradeService = new TenantDatabaseUpgradeService(tenantDetailsService, tenantStoreDataSource, fineractProperties,
-                databaseStateVerifier, liquibaseFactory, tenantDataSourceFactory);
+                databaseStateVerifier, liquibaseFactory, tenantDataSourceFactory, environment, Arrays.asList(tenantPasswordEncryptor));
     }
 }

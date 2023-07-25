@@ -18,16 +18,20 @@
  */
 package org.apache.fineract.infrastructure.report.service;
 
+import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
+import org.apache.fineract.infrastructure.dataqueries.data.ReportExportType;
 import org.apache.fineract.infrastructure.security.utils.SQLInjectionValidator;
 
 public interface ReportingProcessService {
 
     Response processRequest(String reportName, MultivaluedMap<String, String> queryParams);
+
+    List<ReportExportType> getAvailableExportTargets();
 
     default Map<String, String> getReportParams(final MultivaluedMap<String, String> queryParams) {
         final Map<String, String> reportParams = new HashMap<>();

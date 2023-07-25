@@ -40,13 +40,16 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class ConcurrencyIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConcurrencyIntegrationTest.class);
@@ -77,7 +80,7 @@ public class ConcurrencyIntegrationTest {
         final Integer loanID = applyForLoanApplication(clientID, loanProductID, "12,000.00");
         this.loanTransactionHelper.approveLoan("20 September 2011", loanID);
         String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, loanID);
-        this.loanTransactionHelper.disburseLoan("20 September 2011", loanID, "12,000.00",
+        this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount("20 September 2011", loanID, "12,000.00",
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         ExecutorService executor = Executors.newFixedThreadPool(MYTHREADS);
         Calendar date = Calendar.getInstance();

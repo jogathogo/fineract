@@ -39,13 +39,16 @@ import org.apache.fineract.integrationtests.common.WorkingDaysHelper;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanRescheduleRequestTestBuilder;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class LoanRescheduleWithAdvancePaymentTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanRescheduleWithAdvancePaymentTest.class);
@@ -126,7 +129,7 @@ public class LoanRescheduleWithAdvancePaymentTest {
 
         if (this.loanId != null) {
             String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, this.loanId);
-            this.loanTransactionHelper.disburseLoan(disburseDate, this.loanId,
+            this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(disburseDate, this.loanId,
                     JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
             LOG.info("Successfully disbursed loan (ID: {} )", this.loanId);
         }
@@ -204,7 +207,7 @@ public class LoanRescheduleWithAdvancePaymentTest {
                 .withRepaymentFrequencyTypeAsMonths().withAmortizationTypeAsEqualInstallments().withInterestCalculationPeriodTypeAsDays()
                 .withInterestRatePerPeriod("12").withInterestTypeAsDecliningBalance().withSubmittedOnDate(submittedDate)
                 .withExpectedDisbursementDate(submittedDate).withFirstRepaymentDate(firstRepaymentDate)
-                .withwithRepaymentStrategy(LoanApplicationTestBuilder.INTEREST_PRINCIPAL_PENALTIES_FEES_ORDER_STRATEGY)
+                .withRepaymentStrategy(LoanApplicationTestBuilder.INTEREST_PRINCIPAL_PENALTIES_FEES_ORDER_STRATEGY)
                 .withinterestChargedFromDate(submittedDate).build(this.clientId.toString(), this.loanProductId.toString(), null);
 
         this.loanId = this.loanTransactionHelper.getLoanId(loanApplicationJSON);
@@ -318,7 +321,7 @@ public class LoanRescheduleWithAdvancePaymentTest {
                 .withRepaymentFrequencyTypeAsMonths().withAmortizationTypeAsEqualInstallments().withInterestCalculationPeriodTypeAsDays()
                 .withInterestRatePerPeriod("12").withInterestTypeAsDecliningBalance().withSubmittedOnDate(submittedDate)
                 .withExpectedDisbursementDate(submittedDate).withFirstRepaymentDate(firstRepaymentDate)
-                .withwithRepaymentStrategy(LoanApplicationTestBuilder.INTEREST_PRINCIPAL_PENALTIES_FEES_ORDER_STRATEGY)
+                .withRepaymentStrategy(LoanApplicationTestBuilder.INTEREST_PRINCIPAL_PENALTIES_FEES_ORDER_STRATEGY)
                 .withinterestChargedFromDate(submittedDate).build(this.clientId.toString(), this.loanProductId.toString(), null);
 
         this.loanId = this.loanTransactionHelper.getLoanId(loanApplicationJSON);

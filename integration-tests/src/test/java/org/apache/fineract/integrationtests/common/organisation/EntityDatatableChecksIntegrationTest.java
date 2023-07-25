@@ -21,6 +21,7 @@ package org.apache.fineract.integrationtests.common.organisation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.google.gson.Gson;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
@@ -30,6 +31,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.fineract.client.models.PostClientsResponse;
+import org.apache.fineract.client.models.PostEntityDatatableChecksTemplateResponse;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.CollateralManagementHelper;
 import org.apache.fineract.integrationtests.common.CommonConstants;
@@ -37,6 +40,7 @@ import org.apache.fineract.integrationtests.common.GroupHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.apache.fineract.integrationtests.common.savings.SavingsAccountHelper;
 import org.apache.fineract.integrationtests.common.savings.SavingsProductHelper;
@@ -44,12 +48,14 @@ import org.apache.fineract.integrationtests.common.system.DatatableHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Entity Datatable Checks Integration Test for checking Creation, Deletion and Retrieval of Entity-Datatable Check
  */
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class EntityDatatableChecksIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(EntityDatatableChecksIntegrationTest.class);
@@ -79,6 +85,26 @@ public class EntityDatatableChecksIntegrationTest {
         this.responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
         this.entityDatatableChecksHelper = new EntityDatatableChecksHelper(this.requestSpec, this.responseSpec);
         this.datatableHelper = new DatatableHelper(this.requestSpec, this.responseSpec);
+    }
+
+    @Test
+    public void validateCreateDeleteDatatableCheck() {
+        // creating datatable
+        String datatableName = this.datatableHelper.createDatatable(CLIENT_APP_TABLE_NAME, false);
+        DatatableHelper.verifyDatatableCreatedOnServer(this.requestSpec, this.responseSpec, datatableName);
+
+        // creating new entity datatable check
+        Integer entityDatatableCheckId = this.entityDatatableChecksHelper.createEntityDatatableCheck(CLIENT_APP_TABLE_NAME, datatableName,
+                100, null);
+        assertNotNull(entityDatatableCheckId, "ERROR IN CREATING THE ENTITY DATATABLE CHECK");
+
+        // deleting entity datatable check
+        entityDatatableCheckId = this.entityDatatableChecksHelper.deleteEntityDatatableCheck(entityDatatableCheckId);
+        assertNotNull(entityDatatableCheckId, "ERROR IN DELETING THE ENTITY DATATABLE CHECK");
+
+        // deleting the datatable
+        String deletedDataTableName = this.datatableHelper.deleteDatatable(datatableName);
+        assertEquals(datatableName, deletedDataTableName, "ERROR IN DELETING THE DATATABLE");
     }
 
     @Test
@@ -519,7 +545,7 @@ public class EntityDatatableChecksIntegrationTest {
         HashMap<String, Object> datatableMap = new HashMap<>();
         HashMap<String, Object> dataMap = new HashMap<>();
         dataMap.put("locale", "en");
-        dataMap.put("Spouse Name", Utils.randomNameGenerator("Spouse_name", 4));
+        dataMap.put("Spouse Name", Utils.randomStringGenerator("Spouse_name", 4));
         dataMap.put("Number of Dependents", 5);
         dataMap.put("Time of Visit", "01 December 2016 04:03");
         dataMap.put("dateFormat", DATE_TIME_FORMAT);
@@ -529,4 +555,77 @@ public class EntityDatatableChecksIntegrationTest {
         datatablesListMap.add(datatableMap);
         return datatablesListMap;
     }
+
+    @Test
+    public void createClientWithDatatableUsingEntitySubtype() {
+        // creating datatable for client entity person subentity
+        HashMap<String, Object> columnMap = new HashMap<>();
+        final List<HashMap<String, Object>> datatableColumnsList = new ArrayList<>();
+        final String datatableNamePerson = Utils.uniqueRandomStringGenerator(CLIENT_APP_TABLE_NAME + "_person_", 5).toLowerCase()
+                .toLowerCase();
+        final String datatableNameEntity = Utils.uniqueRandomStringGenerator(CLIENT_APP_TABLE_NAME + "_entity_", 5).toLowerCase()
+                .toLowerCase();
+
+        String itsAString = "itsastring";
+        DatatableHelper.addDatatableColumns(datatableColumnsList, itsAString, "String", true, 10, null);
+
+        // Person Subtype
+        columnMap.put("datatableName", datatableNamePerson);
+        columnMap.put("apptableName", CLIENT_APP_TABLE_NAME);
+        columnMap.put("entitySubType", "PERSON");
+        columnMap.put("multiRow", false);
+        String dateFormat = "dateFormat";
+
+        columnMap.put("columns", datatableColumnsList);
+        String datatabelRequestJsonString = new Gson().toJson(columnMap);
+        LOG.info("map : {}", datatabelRequestJsonString);
+
+        datatableHelper.createDatatable(datatabelRequestJsonString, "");
+
+        PostEntityDatatableChecksTemplateResponse entityDatatableChecksResponse = entityDatatableChecksHelper
+                .addEntityDatatableCheck(CLIENT_APP_TABLE_NAME, datatableNamePerson, 100, null);
+        assertNotNull(entityDatatableChecksResponse);
+        final Long personDatatableCheck = entityDatatableChecksResponse.getResourceId();
+        LOG.info("entityDatatableChecksResponse Person: {}", entityDatatableChecksResponse.getResourceId());
+
+        // Entity Subtype
+        columnMap = new HashMap<>();
+        columnMap.put("datatableName", datatableNameEntity);
+        columnMap.put("apptableName", CLIENT_APP_TABLE_NAME);
+        columnMap.put("entitySubType", "ENTITY");
+        columnMap.put("multiRow", false);
+
+        columnMap.put("columns", datatableColumnsList);
+        datatabelRequestJsonString = new Gson().toJson(columnMap);
+        LOG.info("map : {}", datatabelRequestJsonString);
+
+        datatableHelper.createDatatable(datatabelRequestJsonString, "");
+
+        entityDatatableChecksResponse = entityDatatableChecksHelper.addEntityDatatableCheck(CLIENT_APP_TABLE_NAME, datatableNameEntity, 100,
+                null);
+        assertNotNull(entityDatatableChecksResponse);
+        final Long entityDatatableCheck = entityDatatableChecksResponse.getResourceId();
+        LOG.info("entityDatatableChecksResponse Entity: {}", entityDatatableChecksResponse.getResourceId());
+
+        final HashMap<String, Object> datatableEntryMap = new HashMap<>();
+        datatableEntryMap.put(itsAString, Utils.randomStringGenerator("", 8));
+        datatableEntryMap.put("locale", "en");
+
+        final HashMap<String, Object> datatablesMap = new HashMap<>();
+        datatablesMap.put("registeredTableName", datatableNamePerson);
+        datatablesMap.put("data", datatableEntryMap);
+
+        String datatablesJsonString = new Gson().toJson(datatablesMap);
+        LOG.info("map : {}", datatablesJsonString);
+
+        PostClientsResponse postClientsResponse = ClientHelper.createClientAsPersonWithDatatable(requestSpec, responseSpec, "04 March 2011",
+                "1", datatablesMap);
+        assertNotNull(postClientsResponse);
+        assertNotNull(postClientsResponse.getResourceId());
+
+        // Remove the Entity Datatable checks for others tests
+        entityDatatableChecksHelper.deleteEntityDatatableCheck(personDatatableCheck.intValue());
+        entityDatatableChecksHelper.deleteEntityDatatableCheck(entityDatatableCheck.intValue());
+    }
+
 }

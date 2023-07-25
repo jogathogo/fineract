@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.portfolio.loanaccount.guarantor.service;
 
+import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -27,22 +28,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import javax.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
+import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
+import org.apache.fineract.infrastructure.core.service.ExternalIdFactory;
+import org.apache.fineract.infrastructure.event.business.BusinessEventListener;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanAdjustTransactionBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanApprovedBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanUndoApprovalBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanUndoDisbursalBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanTransactionMakeRepaymentPostBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanUndoWrittenOffBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanWrittenOffPostBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.organisation.monetary.domain.MoneyHelper;
 import org.apache.fineract.portfolio.account.PortfolioAccountType;
 import org.apache.fineract.portfolio.account.data.AccountTransferDTO;
 import org.apache.fineract.portfolio.account.domain.AccountTransferDetails;
 import org.apache.fineract.portfolio.account.domain.AccountTransferType;
 import org.apache.fineract.portfolio.account.service.AccountTransfersWritePlatformService;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEntity;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEvents;
-import org.apache.fineract.portfolio.common.service.BusinessEventListener;
-import org.apache.fineract.portfolio.common.service.BusinessEventNotifierService;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanRepository;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.guarantor.GuarantorConstants;
 import org.apache.fineract.portfolio.loanaccount.guarantor.domain.Guarantor;
@@ -60,10 +70,10 @@ import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountAssembler;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountTransaction;
 import org.apache.fineract.portfolio.savings.exception.InsufficientAccountBalanceException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class GuarantorDomainServiceImpl implements GuarantorDomainService {
 
     private final GuarantorRepository guarantorRepository;
@@ -74,44 +84,29 @@ public class GuarantorDomainServiceImpl implements GuarantorDomainService {
     private final DepositAccountOnHoldTransactionRepository depositAccountOnHoldTransactionRepository;
     private final Map<Long, Long> releaseLoanIds = new HashMap<>(2);
     private final SavingsAccountAssembler savingsAccountAssembler;
-
-    @Autowired
-    public GuarantorDomainServiceImpl(final GuarantorRepository guarantorRepository,
-            final GuarantorFundingRepository guarantorFundingRepository,
-            final GuarantorFundingTransactionRepository guarantorFundingTransactionRepository,
-            final AccountTransfersWritePlatformService accountTransfersWritePlatformService,
-            final BusinessEventNotifierService businessEventNotifierService,
-            final DepositAccountOnHoldTransactionRepository depositAccountOnHoldTransactionRepository,
-            final SavingsAccountAssembler savingsAccountAssembler) {
-        this.guarantorRepository = guarantorRepository;
-        this.guarantorFundingRepository = guarantorFundingRepository;
-        this.guarantorFundingTransactionRepository = guarantorFundingTransactionRepository;
-        this.accountTransfersWritePlatformService = accountTransfersWritePlatformService;
-        this.businessEventNotifierService = businessEventNotifierService;
-        this.depositAccountOnHoldTransactionRepository = depositAccountOnHoldTransactionRepository;
-        this.savingsAccountAssembler = savingsAccountAssembler;
-    }
+    private final ConfigurationDomainService configurationDomainService;
+    private final ExternalIdFactory externalIdFactory;
+    private final LoanRepository loanRepository;
 
     @PostConstruct
     public void addListeners() {
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_APPROVED, new ValidateOnBusinessEvent());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_APPROVED, new HoldFundsOnBusinessEvent());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_UNDO_APPROVAL, new UndoAllFundTransactions());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_UNDO_DISBURSAL,
+        businessEventNotifierService.addPostBusinessEventListener(LoanApprovedBusinessEvent.class, new ValidateOnBusinessEvent());
+        businessEventNotifierService.addPostBusinessEventListener(LoanApprovedBusinessEvent.class, new HoldFundsOnBusinessEvent());
+        businessEventNotifierService.addPostBusinessEventListener(LoanUndoApprovalBusinessEvent.class, new UndoAllFundTransactions());
+        businessEventNotifierService.addPostBusinessEventListener(LoanUndoDisbursalBusinessEvent.class,
                 new ReverseAllFundsOnBusinessEvent());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_ADJUST_TRANSACTION,
+        businessEventNotifierService.addPostBusinessEventListener(LoanAdjustTransactionBusinessEvent.class,
                 new AdjustFundsOnBusinessEvent());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_MAKE_REPAYMENT,
+        businessEventNotifierService.addPostBusinessEventListener(LoanTransactionMakeRepaymentPostBusinessEvent.class,
                 new ReleaseFundsOnBusinessEvent());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_WRITTEN_OFF, new ReleaseAllFunds());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_UNDO_WRITTEN_OFF,
-                new ReverseFundsOnBusinessEvent());
+        businessEventNotifierService.addPostBusinessEventListener(LoanWrittenOffPostBusinessEvent.class, new ReleaseAllFunds());
+        businessEventNotifierService.addPostBusinessEventListener(LoanUndoWrittenOffBusinessEvent.class, new ReverseFundsOnBusinessEvent());
     }
 
     @Override
     public void validateGuarantorBusinessRules(Loan loan) {
         LoanProduct loanProduct = loan.loanProduct();
-        BigDecimal principal = loan.getPrincpal().getAmount();
+        BigDecimal principal = loan.getPrincipal().getAmount();
         if (loanProduct.isHoldGuaranteeFundsEnabled()) {
             LoanProductGuaranteeDetails guaranteeData = loanProduct.getLoanProductGuaranteeDetails();
             final List<Guarantor> existGuarantorList = this.guarantorRepository.findByLoan(loan);
@@ -216,14 +211,14 @@ public class GuarantorDomainServiceImpl implements GuarantorDomainService {
      * account to loan account and releases guarantor)
      */
     @Override
-    public void transaferFundsFromGuarantor(final Loan loan) {
+    public void transferFundsFromGuarantor(final Loan loan) {
         if (loan.getGuaranteeAmount().compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
         final List<Guarantor> existGuarantorList = this.guarantorRepository.findByLoan(loan);
         final boolean isRegularTransaction = true;
         final boolean isExceptionForBalanceCheck = true;
-        LocalDate transactionDate = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
+        LocalDate transactionDate = DateUtils.getBusinessLocalDate();
         PortfolioAccountType fromAccountType = PortfolioAccountType.SAVINGS;
         PortfolioAccountType toAccountType = PortfolioAccountType.LOAN;
         final Long toAccountId = loan.getId();
@@ -239,29 +234,27 @@ public class GuarantorDomainServiceImpl implements GuarantorDomainService {
         final AccountTransferDetails accountTransferDetails = null;
         final String noteText = null;
 
-        final String txnExternalId = null;
-        final SavingsAccount toSavingsAccount = null;
-
         Long loanId = loan.getId();
 
         for (Guarantor guarantor : existGuarantorList) {
             final List<GuarantorFundingDetails> fundingDetails = guarantor.getGuarantorFundDetails();
             for (GuarantorFundingDetails guarantorFundingDetails : fundingDetails) {
+                Loan freshLoan = loanRepository.findById(loanId).orElseThrow();
                 if (guarantorFundingDetails.getStatus().isActive()) {
                     final SavingsAccount fromSavingsAccount = guarantorFundingDetails.getLinkedSavingsAccount();
                     final Long fromAccountId = fromSavingsAccount.getId();
                     releaseLoanIds.put(loanId, guarantorFundingDetails.getId());
                     try {
                         BigDecimal remainingAmount = guarantorFundingDetails.getAmountRemaining();
-                        if (loan.getGuaranteeAmount().compareTo(loan.getPrincpal().getAmount()) > 0) {
-                            remainingAmount = remainingAmount.multiply(loan.getPrincpal().getAmount()).divide(loan.getGuaranteeAmount(),
-                                    MoneyHelper.getRoundingMode());
+                        if (freshLoan.getGuaranteeAmount().compareTo(freshLoan.getPrincipal().getAmount()) > 0) {
+                            remainingAmount = remainingAmount.multiply(freshLoan.getPrincipal().getAmount())
+                                    .divide(freshLoan.getGuaranteeAmount(), MoneyHelper.getRoundingMode());
                         }
+                        ExternalId externalId = externalIdFactory.create();
                         AccountTransferDTO accountTransferDTO = new AccountTransferDTO(transactionDate, remainingAmount, fromAccountType,
                                 toAccountType, fromAccountId, toAccountId, description, locale, fmt, paymentDetail, fromTransferType,
-                                toTransferType, chargeId, loanInstallmentNumber, transferType, accountTransferDetails, noteText,
-                                txnExternalId, loan, toSavingsAccount, fromSavingsAccount, isRegularTransaction,
-                                isExceptionForBalanceCheck);
+                                toTransferType, chargeId, loanInstallmentNumber, transferType, accountTransferDetails, noteText, externalId,
+                                null, null, fromSavingsAccount, isRegularTransaction, isExceptionForBalanceCheck);
                         transferAmount(accountTransferDTO);
                     } finally {
                         releaseLoanIds.remove(loanId);
@@ -405,7 +398,7 @@ public class GuarantorDomainServiceImpl implements GuarantorDomainService {
 
             BigDecimal amountForRelease = loanTransaction.getPrincipalPortion();
             BigDecimal totalGuaranteeAmount = loan.getGuaranteeAmount();
-            BigDecimal principal = loan.getPrincpal().getAmount();
+            BigDecimal principal = loan.getPrincipal().getAmount();
             if ((amountForRelease != null) && (totalGuaranteeAmount != null)) {
                 amountForRelease = amountForRelease.multiply(totalGuaranteeAmount).divide(principal, MoneyHelper.getRoundingMode());
                 List<DepositAccountOnHoldTransaction> accountOnHoldTransactions = new ArrayList<>();
@@ -525,138 +518,91 @@ public class GuarantorDomainServiceImpl implements GuarantorDomainService {
         }
     }
 
-    private class ValidateOnBusinessEvent implements BusinessEventListener {
+    private class ValidateOnBusinessEvent implements BusinessEventListener<LoanApprovedBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                validateGuarantorBusinessRules(loan);
-            }
+        public void onBusinessEvent(LoanApprovedBusinessEvent event) {
+            Loan loan = event.get();
+            validateGuarantorBusinessRules(loan);
         }
     }
 
-    private class HoldFundsOnBusinessEvent implements BusinessEventListener {
+    private class HoldFundsOnBusinessEvent implements BusinessEventListener<LoanApprovedBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                holdGuarantorFunds(loan);
-            }
+        public void onBusinessEvent(LoanApprovedBusinessEvent event) {
+            Loan loan = event.get();
+            holdGuarantorFunds(loan);
         }
     }
 
-    private class ReleaseFundsOnBusinessEvent implements BusinessEventListener {
+    private class ReleaseFundsOnBusinessEvent implements BusinessEventListener<LoanTransactionMakeRepaymentPostBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN_TRANSACTION);
-            if (entity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) entity;
-                if (releaseLoanIds.containsKey(loanTransaction.getLoan().getId())) {
-                    completeGuarantorFund(loanTransaction);
-                } else {
-                    releaseGuarantorFunds(loanTransaction);
-                }
-            }
-        }
-    }
-
-    private class ReverseFundsOnBusinessEvent implements BusinessEventListener {
-
-        @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN_TRANSACTION);
-            if (entity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) entity;
-                List<Long> reersedTransactions = new ArrayList<>(1);
-                reersedTransactions.add(loanTransaction.getId());
-                reverseTransaction(reersedTransactions);
-            }
-        }
-    }
-
-    private class AdjustFundsOnBusinessEvent implements BusinessEventListener {
-
-        @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN_ADJUSTED_TRANSACTION);
-            if (entity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) entity;
-                List<Long> reersedTransactions = new ArrayList<>(1);
-                reersedTransactions.add(loanTransaction.getId());
-                reverseTransaction(reersedTransactions);
-            }
-            Object transactionentity = businessEventEntity.get(BusinessEntity.LOAN_TRANSACTION);
-            if (transactionentity != null && transactionentity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) transactionentity;
+        public void onBusinessEvent(LoanTransactionMakeRepaymentPostBusinessEvent event) {
+            LoanTransaction loanTransaction = event.get();
+            if (releaseLoanIds.containsKey(loanTransaction.getLoan().getId())) {
+                completeGuarantorFund(loanTransaction);
+            } else {
                 releaseGuarantorFunds(loanTransaction);
             }
         }
     }
 
-    private class ReverseAllFundsOnBusinessEvent implements BusinessEventListener {
+    private class ReverseFundsOnBusinessEvent implements BusinessEventListener<LoanUndoWrittenOffBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
+        public void onBusinessEvent(LoanUndoWrittenOffBusinessEvent event) {
+            LoanTransaction loanTransaction = event.get();
+            List<Long> reversedTransactions = new ArrayList<>();
+            reversedTransactions.add(loanTransaction.getId());
+            reverseTransaction(reversedTransactions);
+        }
+    }
+
+    private class AdjustFundsOnBusinessEvent implements BusinessEventListener<LoanAdjustTransactionBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                List<Long> reersedTransactions = new ArrayList<>(1);
-                reersedTransactions.addAll(loan.findExistingTransactionIds());
-                reverseTransaction(reersedTransactions);
+        public void onBusinessEvent(LoanAdjustTransactionBusinessEvent event) {
+            LoanAdjustTransactionBusinessEvent.Data eventData = event.get();
+
+            LoanTransaction loanTransaction = eventData.getTransactionToAdjust();
+            List<Long> reersedTransactions = new ArrayList<>(1);
+            reersedTransactions.add(loanTransaction.getId());
+            reverseTransaction(reersedTransactions);
+
+            LoanTransaction newTransaction = event.get().getNewTransactionDetail();
+            if (newTransaction != null) {
+                releaseGuarantorFunds(newTransaction);
             }
         }
     }
 
-    private class UndoAllFundTransactions implements BusinessEventListener {
+    private class ReverseAllFundsOnBusinessEvent implements BusinessEventListener<LoanUndoDisbursalBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
-
-        @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                reverseAllFundTransaction(loan);
-            }
+        public void onBusinessEvent(LoanUndoDisbursalBusinessEvent event) {
+            Loan loan = event.get();
+            List<Long> reversedTransactions = new ArrayList<>(loan.findExistingTransactionIds());
+            reverseTransaction(reversedTransactions);
         }
     }
 
-    private class ReleaseAllFunds implements BusinessEventListener {
+    private class UndoAllFundTransactions implements BusinessEventListener<LoanUndoApprovalBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(@SuppressWarnings("unused") Map<BusinessEntity, Object> businessEventEntity) {}
+        public void onBusinessEvent(LoanUndoApprovalBusinessEvent event) {
+            Loan loan = event.get();
+            reverseAllFundTransaction(loan);
+        }
+    }
+
+    private class ReleaseAllFunds implements BusinessEventListener<LoanWrittenOffPostBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEntity.LOAN_TRANSACTION);
-            if (entity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) entity;
-                releaseAllGuarantors(loanTransaction);
-            }
+        public void onBusinessEvent(LoanWrittenOffPostBusinessEvent event) {
+            LoanTransaction loanTransaction = event.get();
+            releaseAllGuarantors(loanTransaction);
         }
     }
 

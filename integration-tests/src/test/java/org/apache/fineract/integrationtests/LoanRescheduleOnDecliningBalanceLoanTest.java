@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.fineract.client.models.PostLoansLoanIdTransactionsRequest;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.CollateralManagementHelper;
 import org.apache.fineract.integrationtests.common.GlobalConfigurationHelper;
@@ -40,14 +41,17 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanRescheduleRequestTestBuilder;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class LoanRescheduleOnDecliningBalanceLoanTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanRescheduleOnDecliningBalanceLoanTest.class);
@@ -96,6 +100,16 @@ public class LoanRescheduleOnDecliningBalanceLoanTest {
     /**
      * Creates the client, loan product, and loan entities
      **/
+    private void createRequiredEntitiesNoInterest() {
+        this.createClientEntity();
+        this.createLoanProductEntityNoInterest();
+        this.createLoanEntityNoInterest();
+        this.enableConfig();
+    }
+
+    /**
+     * Creates the client, loan product, and loan entities
+     **/
     private void createRequiredEntitiesWithRecalculationEnabled() {
         this.createClientEntity();
         this.createLoanProductWithInterestRecalculation();
@@ -125,6 +139,20 @@ public class LoanRescheduleOnDecliningBalanceLoanTest {
 
         this.loanProductId = this.loanTransactionHelper.getLoanProductId(loanProductJSON);
         LOG.info("Successfully created loan product  (ID:{}) ", this.loanProductId);
+    }
+
+    /**
+     * create a new loan product
+     **/
+    private void createLoanProductEntityNoInterest() {
+        LOG.info("-------------------------------- - CREATING LOAN PRODUCT ------------------------------------------");
+
+        final String loanProductJSON = new LoanProductTestBuilder().withPrincipal(loanPrincipalAmount)
+                .withNumberOfRepayments(numberOfRepayments).withinterestRatePerPeriod("0").withInterestRateFrequencyTypeAsYear()
+                .withInterestCalculationPeriodTypeAsDays().build(null);
+        this.loanProductId = this.loanTransactionHelper.getLoanProductId(loanProductJSON);
+        LOG.info("Successfully created loan product(ID:{}) ", this.loanProductId);
+
     }
 
     private void createLoanProductWithInterestRecalculation() {
@@ -189,6 +217,35 @@ public class LoanRescheduleOnDecliningBalanceLoanTest {
         this.disburseLoan(this.dateString);
     }
 
+    /**
+     * submit a new loan application, approve and disburse the loan
+     **/
+    private void createLoanEntityNoInterest() {
+        LOG.info("---------------------------------NEW LOAN APPLICATION------------------------------------------");
+
+        List<HashMap> collaterals = new ArrayList<>();
+        final Integer collateralId = CollateralManagementHelper.createCollateralProduct(this.requestSpec, this.responseSpec);
+        Assertions.assertNotNull(collateralId);
+        final Integer clientCollateralId = CollateralManagementHelper.createClientCollateral(this.requestSpec, this.responseSpec,
+                this.clientId.toString(), collateralId);
+        Assertions.assertNotNull(clientCollateralId);
+        addCollaterals(collaterals, clientCollateralId, BigDecimal.valueOf(1));
+
+        final String loanApplicationJSON = new LoanApplicationTestBuilder().withPrincipal(loanPrincipalAmount)
+                .withLoanTermFrequency(numberOfRepayments).withLoanTermFrequencyAsMonths().withNumberOfRepayments(numberOfRepayments)
+                .withRepaymentEveryAfter("1").withRepaymentFrequencyTypeAsMonths().withAmortizationTypeAsEqualInstallments()
+                .withInterestCalculationPeriodTypeAsDays().withInterestRatePerPeriod("0").withSubmittedOnDate(dateString)
+                .withExpectedDisbursementDate(dateString).withCollaterals(collaterals).withPrincipalGrace("2").withInterestGrace("2")
+                .build(this.clientId.toString(), this.loanProductId.toString(), null);
+
+        this.loanId = this.loanTransactionHelper.getLoanId(loanApplicationJSON);
+
+        LOG.info("Sucessfully created loan (ID: {} )", this.loanId);
+
+        this.approveLoanApplication(this.dateString);
+        this.disburseLoan(this.dateString);
+    }
+
     private void addCollaterals(List<HashMap> collaterals, Integer collateralId, BigDecimal quantity) {
         collaterals.add(collaterals(collateralId, quantity));
     }
@@ -218,7 +275,7 @@ public class LoanRescheduleOnDecliningBalanceLoanTest {
 
         if (this.loanId != null) {
             String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, this.loanId);
-            this.loanTransactionHelper.disburseLoan(disburseDate, this.loanId,
+            this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(disburseDate, this.loanId,
                     JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
             LOG.info("Successfully disbursed loan (ID: {} )", this.loanId);
         }
@@ -244,6 +301,36 @@ public class LoanRescheduleOnDecliningBalanceLoanTest {
         this.createRequiredEntities();
         this.createAndApproveLoanRescheduleRequestForRecoverInterestInterestFirst();
 
+    }
+
+    @Test
+    public void testCreateLoanRescheduleRequestFailIfLoanIsChargedOff() {
+        // create all required entities
+        this.createRequiredEntitiesNoInterest();
+        this.createLoanRescheduleRequestWhichFailsAsLoanIdChargedOff();
+
+    }
+
+    /**
+     * create new loan reschedule request
+     **/
+    private void createLoanRescheduleRequestWhichFailsAsLoanIdChargedOff() {
+
+        final String requestJSON = new LoanRescheduleRequestTestBuilder().updateGraceOnPrincipal(null).updateGraceOnInterest(null)
+                .updateExtraTerms(null).updateRescheduleFromDate("04 January 2015").updateAdjustedDueDate("04 October 2015")
+                .updateRecalculateInterest(true).build(this.loanId.toString());
+
+        this.loanTransactionHelper.chargeOffLoan((long) this.loanId,
+                new PostLoansLoanIdTransactionsRequest().transactionDate("04 January 2015").locale("en").dateFormat("dd MMMM yyyy"));
+
+        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(403).build();
+        LoanRescheduleRequestHelper errorLoanRescheduleRequestHelper = new LoanRescheduleRequestHelper(this.requestSpec, responseSpec);
+        HashMap response = errorLoanRescheduleRequestHelper.createLoanRescheduleRequestWithFullResponse(requestJSON);
+        assertEquals("error.msg.loan.is.charged.off", ((Map) ((List) response.get("errors")).get(0)).get("userMessageGlobalisationCode"));
+
+        this.loanTransactionHelper.undoChargeOffLoan((long) this.loanId, new PostLoansLoanIdTransactionsRequest());
+        this.loanTransactionHelper.closeRescheduledLoan((long) this.loanId,
+                new PostLoansLoanIdTransactionsRequest().dateFormat("dd MMMM yyyy").transactionDate("04 January 2015").locale("en"));
     }
 
     /**

@@ -30,14 +30,13 @@ import org.apache.fineract.infrastructure.bulkimport.data.GlobalEntityType;
 import org.apache.fineract.infrastructure.bulkimport.domain.ImportDocument;
 import org.apache.fineract.infrastructure.bulkimport.domain.ImportDocumentRepository;
 import org.apache.fineract.infrastructure.bulkimport.importhandler.ImportHandler;
-import org.apache.fineract.infrastructure.core.domain.FineractPlatformTenant;
 import org.apache.fineract.infrastructure.core.exception.GeneralPlatformDomainRuleException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.ThreadLocalContextUtil;
+import org.apache.fineract.infrastructure.core.service.tenant.TenantDetailsService;
 import org.apache.fineract.infrastructure.documentmanagement.command.DocumentCommand;
 import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
 import org.apache.fineract.infrastructure.documentmanagement.service.DocumentWritePlatformService;
-import org.apache.fineract.infrastructure.security.service.TenantDetailsService;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,10 +65,7 @@ public class BulkImportEventListener implements ApplicationListener<BulkImportEv
 
     @Override
     public void onApplicationEvent(final BulkImportEvent event) {
-
-        final String tenantIdentifier = event.getTenantIdentifier();
-        final FineractPlatformTenant tenant = this.tenantDetailsService.loadTenantById(tenantIdentifier);
-        ThreadLocalContextUtil.setTenant(tenant);
+        ThreadLocalContextUtil.init(event.getContext());
         ImportHandler importHandler = null;
         final ImportDocument importDocument = this.importRepository.findById(event.getImportId()).orElse(null);
         final GlobalEntityType entityType = GlobalEntityType.fromInt(importDocument.getEntityType());
@@ -84,7 +80,7 @@ public class BulkImportEventListener implements ApplicationListener<BulkImportEv
             case CHART_OF_ACCOUNTS:
                 importHandler = this.applicationContext.getBean("chartOfAccountsImportHandler", ImportHandler.class);
             break;
-            case CLIENTS_ENTTTY:
+            case CLIENTS_ENTITY:
                 importHandler = this.applicationContext.getBean("clientEntityImportHandler", ImportHandler.class);
             break;
             case CLIENTS_PERSON:

@@ -20,15 +20,13 @@ package org.apache.fineract.portfolio.shareproducts.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
-import org.apache.fineract.portfolio.products.service.ProductReadPlatformService;
+import org.apache.fineract.portfolio.products.service.ShareProductReadPlatformService;
 import org.apache.fineract.portfolio.shareaccounts.data.ShareAccountData;
 import org.apache.fineract.portfolio.shareaccounts.data.ShareAccountTransactionData;
 import org.apache.fineract.portfolio.shareaccounts.domain.PurchasedSharesStatusType;
@@ -43,11 +41,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ShareProductDividendAssembler {
 
-    private final ProductReadPlatformService shareProductReadPlatformService;
+    private final ShareProductReadPlatformService shareProductReadPlatformService;
     private final ShareAccountReadPlatformService shareAccountReadPlatformService;
 
     @Autowired
-    public ShareProductDividendAssembler(final ShareProductReadPlatformServiceImpl shareProductReadPlatformService,
+    public ShareProductDividendAssembler(final ShareProductReadPlatformService shareProductReadPlatformService,
             final ShareAccountReadPlatformService shareAccountReadPlatformService) {
         this.shareProductReadPlatformService = shareProductReadPlatformService;
         this.shareAccountReadPlatformService = shareAccountReadPlatformService;
@@ -57,8 +55,8 @@ public class ShareProductDividendAssembler {
             final LocalDate dividendPeriodStartDate, final LocalDate dividendPeriodEndDate) {
 
         ShareProductData product = (ShareProductData) this.shareProductReadPlatformService.retrieveOne(productId, false);
-        MonetaryCurrency currency = new MonetaryCurrency(product.getCurrency().code(), product.getCurrency().decimalPlaces(),
-                product.getCurrency().currencyInMultiplesOf());
+        MonetaryCurrency currency = new MonetaryCurrency(product.getCurrency().getCode(), product.getCurrency().getDecimalPlaces(),
+                product.getCurrency().getInMultiplesOf());
         Collection<ShareAccountData> shareAccountDatas = this.shareAccountReadPlatformService.retrieveAllShareAccountDataForDividends(
                 productId, product.getAllowDividendCalculationForInactiveClients(), dividendPeriodStartDate);
         if (shareAccountDatas == null || shareAccountDatas.isEmpty()) {
@@ -78,8 +76,7 @@ public class ShareProductDividendAssembler {
         if (numberOfShareDays > 0) {
             double amountPerShareDay = amount.doubleValue() / numberOfShareDays;
             productDividendPayOutDetails = new ShareProductDividendPayOutDetails(productId, Money.of(currency, amount).getAmount(),
-                    Date.from(dividendPeriodStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant()),
-                    Date.from(dividendPeriodEndDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    dividendPeriodStartDate, dividendPeriodEndDate);
             for (ShareAccountData accountData : shareAccountDatas) {
                 long numberOfShareDaysPerAccount = numberOfSharesdaysPerAccount.get(accountData.getId());
                 double amountForAccount = numberOfShareDaysPerAccount * amountPerShareDay;

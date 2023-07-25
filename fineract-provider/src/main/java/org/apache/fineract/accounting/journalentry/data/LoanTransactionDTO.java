@@ -19,11 +19,12 @@
 package org.apache.fineract.accounting.journalentry.data;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import org.apache.fineract.portfolio.loanaccount.data.LoanChargeData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionEnumData;
 
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class LoanTransactionDTO {
     private final Long officeId;
     private final Long paymentTypeId;
     private final String transactionId;
-    private final Date transactionDate;
+    private final LocalDate transactionDate;
     private final LoanTransactionEnumData transactionType;
 
     private final BigDecimal amount;
@@ -56,4 +57,7 @@ public class LoanTransactionDTO {
 
     @Setter
     private boolean isLoanToLoanTransfer;
+
+    private final String chargeRefundChargeType;
+    private final LoanChargeData loanChargeData;
 }

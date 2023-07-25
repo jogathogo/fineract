@@ -18,24 +18,24 @@
  */
 package org.apache.fineract.portfolio.client.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.UniqueConstraint;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
-import org.apache.fineract.infrastructure.core.domain.AbstractAuditableCustom;
+import org.apache.fineract.infrastructure.core.domain.AbstractAuditableWithUTCDateTimeCustom;
 
 @Entity
 @Table(name = "m_client_identifier", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "document_type_id", "document_key" }, name = "unique_identifier_key"),
         @UniqueConstraint(columnNames = { "client_id", "document_key", "active" }, name = "unique_active_client_identifier") })
-public class ClientIdentifier extends AbstractAuditableCustom {
+public class ClientIdentifier extends AbstractAuditableWithUTCDateTimeCustom {
 
     @ManyToOne
     @JoinColumn(name = "client_id", nullable = false)

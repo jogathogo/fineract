@@ -18,15 +18,31 @@
  */
 package org.apache.fineract.portfolio.client.domain;
 
+import org.apache.fineract.infrastructure.core.domain.ExternalId;
+import org.apache.fineract.portfolio.client.domain.search.SearchingClientRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-interface ClientRepository extends JpaRepository<Client, Long>, JpaSpecificationExecutor<Client> {
+public interface ClientRepository extends JpaRepository<Client, Long>, JpaSpecificationExecutor<Client>, SearchingClientRepository {
 
     String FIND_CLIENT_BY_ACCOUNT_NUMBER = "select client from Client client where client.accountNumber = :accountNumber";
 
     @Query(FIND_CLIENT_BY_ACCOUNT_NUMBER)
     Client getClientByAccountNumber(@Param("accountNumber") String accountNumber);
+
+    @Query("""
+            SELECT client
+            FROM Client client
+            JOIN client.office office
+            LEFT JOIN client.transferToOffice transferToOffice
+            WHERE client.id = :clientId
+            AND (office.hierarchy LIKE :officeHierarchy OR transferToOffice.hierarchy LIKE :transferToOfficeHierarchy)
+                """)
+    Client fetchByClientIdAndHierarchy(Long clientId, String officeHierarchy, String transferToOfficeHierarchy);
+
+    @Query("SELECT c.id FROM Client c WHERE c.externalId = :externalId")
+    Long findIdByExternalId(@Param("externalId") ExternalId externalId);
+
 }

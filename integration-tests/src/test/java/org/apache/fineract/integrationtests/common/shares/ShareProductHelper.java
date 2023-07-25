@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
@@ -43,9 +42,9 @@ public class ShareProductHelper {
     private static final String IN_MULTIPLES_OF = "0";
     private static final String USD = "USD";
 
-    private String productName = Utils.randomNameGenerator("SHARE_PRODUCT_", 6);
-    private String shortName = Utils.randomNameGenerator("", 4);
-    private String description = Utils.randomNameGenerator("", 20);
+    private String productName = Utils.uniqueRandomStringGenerator("SHARE_PRODUCT_", 6);
+    private String shortName = Utils.uniqueRandomStringGenerator("", 4);
+    private String description = Utils.randomStringGenerator("", 20);
     private String totalShares = "10000";
     private final String currencyCode = USD;
     private String sharesIssued = "10000";
@@ -106,7 +105,7 @@ public class ShareProductHelper {
 
     public ShareProductHelper withMarketPrice() {
         this.marketPrices = new ArrayList<>();
-        LocalDate currentDate = DateUtils.getLocalDateOfTenant();
+        LocalDate currentDate = Utils.getLocalDateOfTenant();
         String[] prices = { "3.0", "4.0", "5.0", "6.0", "7.0" };
         DateFormat simple = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
         for (int i = 0; i < prices.length; i++) {

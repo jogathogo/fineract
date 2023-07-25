@@ -27,24 +27,25 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.api.ApiRequestParameterHelper;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
@@ -58,23 +59,21 @@ import org.apache.fineract.infrastructure.security.service.PlatformSecurityConte
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 @Component
-@Scope("singleton")
-@Path("{entityType}/{entityId}/documents")
+@Path("/v1/{entityType}/{entityId}/documents")
 @Tag(name = "Documents", description = "Multiple Documents (a combination of a name, description and a file) may be attached to different Entities like Clients, Groups, Staff, Loans, Savings and Client Identifiers in the system\n"
         + "\n" + "Note: The currently allowed Entities are\n" + "\n" + "Clients: URL Pattern as clients\n" + "Staff: URL Pattern as staff\n"
         + "Loans: URL Pattern as loans\n" + "Savings: URL Pattern as savings\n" + "Client Identifiers: URL Pattern as client_identifiers\n"
         + "Groups: URL Pattern as groups")
+@RequiredArgsConstructor
 public class DocumentManagementApiResource {
 
-    private final Set<String> responseDataParameters = new HashSet<>(
+    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(
             Arrays.asList("id", "parentEntityType", "parentEntityId", "name", "fileName", "size", "type", "description"));
 
-    private final String systemEntityType = "DOCUMENT";
+    private static final String SYSTEM_ENTITY_TYPE = "DOCUMENT";
 
     private final PlatformSecurityContext context;
     private final DocumentReadPlatformService documentReadPlatformService;
@@ -82,19 +81,6 @@ public class DocumentManagementApiResource {
     private final ApiRequestParameterHelper apiRequestParameterHelper;
     private final ToApiJsonSerializer<DocumentData> toApiJsonSerializer;
     private final FileUploadValidator fileUploadValidator;
-
-    @Autowired
-    public DocumentManagementApiResource(final PlatformSecurityContext context,
-            final DocumentReadPlatformService documentReadPlatformService, final DocumentWritePlatformService documentWritePlatformService,
-            final ApiRequestParameterHelper apiRequestParameterHelper, final ToApiJsonSerializer<DocumentData> toApiJsonSerializer,
-            final FileUploadValidator fileUploadValidator) {
-        this.context = context;
-        this.documentReadPlatformService = documentReadPlatformService;
-        this.documentWritePlatformService = documentWritePlatformService;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.fileUploadValidator = fileUploadValidator;
-    }
 
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -107,12 +93,12 @@ public class DocumentManagementApiResource {
             @PathParam("entityType") @Parameter(description = "entityType") final String entityType,
             @PathParam("entityId") @Parameter(description = "entityId") final Long entityId) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.systemEntityType);
+        this.context.authenticatedUser().validateHasReadPermission(SYSTEM_ENTITY_TYPE);
 
         final Collection<DocumentData> documentDatas = this.documentReadPlatformService.retrieveAllDocuments(entityType, entityId);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, documentDatas, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, documentDatas, RESPONSE_DATA_PARAMETERS);
     }
 
     @POST
@@ -202,12 +188,12 @@ public class DocumentManagementApiResource {
             @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
             @PathParam("documentId") @Parameter(description = "documentId") final Long documentId, @Context final UriInfo uriInfo) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.systemEntityType);
+        this.context.authenticatedUser().validateHasReadPermission(SYSTEM_ENTITY_TYPE);
 
         final DocumentData documentData = this.documentReadPlatformService.retrieveDocument(entityType, entityId, documentId);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, documentData, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, documentData, RESPONSE_DATA_PARAMETERS);
     }
 
     @GET
@@ -221,7 +207,7 @@ public class DocumentManagementApiResource {
             @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
             @PathParam("documentId") @Parameter(description = "documentId") final Long documentId) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.systemEntityType);
+        this.context.authenticatedUser().validateHasReadPermission(SYSTEM_ENTITY_TYPE);
         final FileData fileData = this.documentReadPlatformService.retrieveFileData(entityType, entityId, documentId);
         return ContentResources.fileDataToResponse(fileData, "attachment");
     }

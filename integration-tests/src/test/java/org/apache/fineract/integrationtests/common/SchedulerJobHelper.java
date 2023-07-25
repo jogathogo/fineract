@@ -20,7 +20,6 @@ package org.apache.fineract.integrationtests.common;
 
 import static java.time.Instant.now;
 import static org.awaitility.Awaitility.await;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -31,6 +30,7 @@ import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -39,10 +39,14 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.fineract.client.models.PutJobsJobIDRequest;
+import org.apache.fineract.infrastructure.businessdate.domain.BusinessDateType;
+import org.apache.fineract.integrationtests.client.IntegrationTest;
+import org.hamcrest.MatcherAssert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SchedulerJobHelper {
+public class SchedulerJobHelper extends IntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchedulerJobHelper.class);
     private final RequestSpecification requestSpec;
@@ -93,9 +97,7 @@ public class SchedulerJobHelper {
 
     public void updateSchedulerStatus(final boolean on) {
         String command = on ? "start" : "stop";
-        final String UPDATE_SCHEDULER_STATUS_URL = "/fineract-provider/api/v1/scheduler?command=" + command + "&" + Utils.TENANT_IDENTIFIER;
-        LOG.info("------------------------ UPDATING SCHEDULER STATUS -------------------------");
-        Utils.performServerPost(requestSpec, response202Spec, UPDATE_SCHEDULER_STATUS_URL, runSchedulerJobAsJSON(), null);
+        ok(fineract().jobsScheduler.changeSchedulerStatus(command));
     }
 
     public Map<String, Object> updateSchedulerJob(int jobId, final boolean active) {
@@ -106,6 +108,10 @@ public class SchedulerJobHelper {
         return response;
     }
 
+    public void updateSchedulerJob(long jobId, PutJobsJobIDRequest request) {
+        ok(fineract().jobs.updateJobDetail(jobId, request));
+    }
+
     private static String updateSchedulerJobAsJSON(final boolean active) {
         final Map<String, String> map = new HashMap<>();
         map.put("active", Boolean.toString(active));
@@ -113,8 +119,12 @@ public class SchedulerJobHelper {
         return new Gson().toJson(map);
     }
 
-    private void runSchedulerJob(int jobId) {
+    public void runSchedulerJob(int jobId) {
         final ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(202).build();
+        runSchedulerJob(jobId, responseSpec);
+    }
+
+    public void runSchedulerJob(int jobId, ResponseSpecification responseSpec) {
         final String RUN_SCHEDULER_JOB_URL = "/fineract-provider/api/v1/jobs/" + jobId + "?command=executeJob&" + Utils.TENANT_IDENTIFIER;
         LOG.info("------------------------ RUN SCHEDULER JOB -------------------------");
         Utils.performServerPost(requestSpec, responseSpec, RUN_SCHEDULER_JOB_URL, runSchedulerJobAsJSON(), null);
@@ -127,7 +137,7 @@ public class SchedulerJobHelper {
         return runSchedulerJob;
     }
 
-    private int getSchedulerJobIdByName(String jobName) {
+    public int getSchedulerJobIdByName(String jobName) {
         List<Map<String, Object>> allSchedulerJobsData = getAllSchedulerJobs();
         for (Integer jobIndex = 0; jobIndex < allSchedulerJobsData.size(); jobIndex++) {
             if (allSchedulerJobsData.get(jobIndex).get("displayName").equals(jobName)) {
@@ -162,30 +172,25 @@ public class SchedulerJobHelper {
 
         // Await JobDetailData.lastRunHistory [JobDetailHistoryData]
         // jobRunStartTime >= beforeExecuteTime (or timeout)
-        await().atMost(timeout).pollInterval(pause).until(jobLastRunHistorySupplier(jobId), lastRunHistory -> {
-            String jobRunStartText = lastRunHistory.get("jobRunStartTime");
-            if (jobRunStartText == null) {
-                return false;
-            }
-            Instant jobRunStartTime = df.parse(jobRunStartText, Instant::from);
-            return jobRunStartTime.equals(beforeExecuteTime) || jobRunStartTime.isAfter(beforeExecuteTime);
-        });
-
-        // Await JobDetailData.lastRunHistory [JobDetailHistoryData]
         // jobRunEndTime to be both set and >= jobRunStartTime (or timeout)
         Map<String, String> finalLastRunHistory = await().atMost(timeout).pollInterval(pause).until(jobLastRunHistorySupplier(jobId),
                 lastRunHistory -> {
+                    String jobRunStartText = lastRunHistory.get("jobRunStartTime");
+                    if (jobRunStartText == null) {
+                        return false;
+                    }
                     String jobRunEndText = lastRunHistory.get("jobRunEndTime");
                     if (jobRunEndText == null) {
                         return false;
                     }
+                    Instant jobRunStartTime = df.parse(jobRunStartText, Instant::from);
                     Instant jobRunEndTime = df.parse(jobRunEndText, Instant::from);
-                    Instant jobRunStartTime = df.parse(lastRunHistory.get("jobRunStartTime"), Instant::from);
-                    return jobRunEndTime.equals(jobRunStartTime) || jobRunEndTime.isAfter(jobRunStartTime);
+                    return (jobRunStartTime.equals(beforeExecuteTime) || jobRunStartTime.isAfter(beforeExecuteTime))
+                            && (jobRunEndTime.equals(jobRunStartTime) || jobRunEndTime.isAfter(jobRunStartTime));
                 });
 
         // Verify triggerType
-        assertThat(finalLastRunHistory.get("triggerType"), is("application"));
+        MatcherAssert.assertThat(finalLastRunHistory.get("triggerType"), is("application"));
 
         // Verify status & propagate jobRunErrorMessage and/or jobRunErrorLog
         // (if any)
@@ -197,6 +202,15 @@ public class SchedulerJobHelper {
         // PS: Checking getSchedulerJobHistory() [/runhistory] is pointless,
         // because the lastRunHistory JobDetailHistoryData is already part of
         // JobDetailData anyway.
+    }
+
+    public void fastForwardTime(LocalDate lastBusinessDateBeforeFastForward, LocalDate dateToFastForward, String jobName,
+            ResponseSpecification responseSpec) {
+        while (lastBusinessDateBeforeFastForward.isBefore(dateToFastForward)) {
+            BusinessDateHelper.updateBusinessDate(requestSpec, responseSpec, BusinessDateType.COB_DATE, lastBusinessDateBeforeFastForward);
+            executeAndAwaitJob(jobName);
+            lastBusinessDateBeforeFastForward = lastBusinessDateBeforeFastForward.plusDays(1);
+        }
     }
 
     @SuppressWarnings("unchecked")

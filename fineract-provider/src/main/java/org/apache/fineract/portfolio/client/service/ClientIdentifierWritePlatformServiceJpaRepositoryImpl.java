@@ -18,8 +18,8 @@
  */
 package org.apache.fineract.portfolio.client.service;
 
+import jakarta.persistence.PersistenceException;
 import java.util.Map;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.codes.domain.CodeValueRepositoryWrapper;
@@ -86,7 +86,7 @@ public class ClientIdentifierWritePlatformServiceJpaRepositoryImpl implements Cl
             final CodeValue documentType = this.codeValueRepository
                     .findOneWithNotFoundDetection(clientIdentifierCommand.getDocumentTypeId());
             documentTypeId = documentType.getId();
-            documentTypeLabel = documentType.label();
+            documentTypeLabel = documentType.getLabel();
 
             final ClientIdentifier clientIdentifier = ClientIdentifier.fromJson(client, documentType, command);
 
@@ -136,7 +136,7 @@ public class ClientIdentifierWritePlatformServiceJpaRepositoryImpl implements Cl
                 }
 
                 documentTypeId = documentType.getId();
-                documentTypeLabel = documentType.label();
+                documentTypeLabel = documentType.getLabel();
                 clientIdentifierForUpdate.update(documentType);
             }
 

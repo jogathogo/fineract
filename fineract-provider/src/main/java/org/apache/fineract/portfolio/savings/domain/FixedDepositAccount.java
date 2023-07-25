@@ -23,24 +23,23 @@ import static org.apache.fineract.portfolio.savings.DepositsApiConstants.deposit
 import static org.apache.fineract.portfolio.savings.DepositsApiConstants.maxDepositTermParamName;
 import static org.apache.fineract.portfolio.savings.DepositsApiConstants.onAccountClosureIdParamName;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Transient;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.CascadeType;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.OneToOne;
-import javax.persistence.Transient;
+import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
@@ -64,6 +63,7 @@ import org.apache.fineract.portfolio.savings.SavingsInterestCalculationType;
 import org.apache.fineract.portfolio.savings.SavingsPeriodFrequencyType;
 import org.apache.fineract.portfolio.savings.SavingsPostingInterestPeriodType;
 import org.apache.fineract.portfolio.savings.domain.interest.PostingPeriod;
+import org.apache.fineract.portfolio.savings.domain.interest.SavingsAccountTransactionDetailsForPostingPeriod;
 import org.apache.fineract.portfolio.savings.service.SavingsEnumerations;
 import org.apache.fineract.useradministration.domain.AppUser;
 
@@ -79,6 +79,8 @@ public class FixedDepositAccount extends SavingsAccount {
 
     @Transient
     protected InterestRateChartAssembler chartAssembler;
+    @Transient
+    private ConfigurationDomainService configurationDomainService;
 
     protected FixedDepositAccount() {
         //
@@ -191,19 +193,20 @@ public class FixedDepositAccount extends SavingsAccount {
     public void updateMaturityDateAndAmountBeforeAccountActivation(final MathContext mc, final boolean isPreMatureClosure,
             final boolean isSavingsInterestPostingAtCurrentPeriodEnd, final Integer financialYearBeginningMonth) {
         List<SavingsAccountTransaction> allTransactions = new ArrayList<>();
+        String refNo = null;
         final Money transactionAmountMoney = Money.of(getCurrency(), this.accountTermAndPreClosure.depositAmount());
         final SavingsAccountTransaction transaction = SavingsAccountTransaction.deposit(null, office(), null,
-                this.accountSubmittedOrActivationDate(), transactionAmountMoney, new Date(), null); // TODO:
-                                                                                                    // verify
-                                                                                                    // if
-                                                                                                    // it
-                                                                                                    // is
-                                                                                                    // ok
-                                                                                                    // to
-                                                                                                    // pass
-                                                                                                    // null
-                                                                                                    // for
-                                                                                                    // AppUser
+                this.accountSubmittedOrActivationDate(), transactionAmountMoney, DateUtils.getLocalDateTimeOfSystem(), null, refNo); // TODO:
+        // verify
+        // if
+        // it
+        // is
+        // ok
+        // to
+        // pass
+        // null
+        // for
+        // AppUser
         transaction.updateRunningBalance(transactionAmountMoney);
         transaction.updateCumulativeBalanceAndDates(this.getCurrency(), interestCalculatedUpto());
         allTransactions.add(transaction);
@@ -231,7 +234,7 @@ public class FixedDepositAccount extends SavingsAccount {
                 isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
 
         // reset end of day balance back to today's date
-        this.resetAccountTransactionsEndOfDayBalances(transactions, DateUtils.getLocalDateOfTenant());
+        this.resetAccountTransactionsEndOfDayBalances(transactions, DateUtils.getBusinessLocalDate());
 
         Money totalInterestPayable = Money.zero(getCurrency());
         for (PostingPeriod postingPeriod : postingPeriods) {
@@ -256,7 +259,7 @@ public class FixedDepositAccount extends SavingsAccount {
             }
         }
 
-        final LocalDate todayDate = DateUtils.getLocalDateOfTenant();
+        final LocalDate todayDate = DateUtils.getBusinessLocalDate();
         if (!this.maturityDate().isAfter(todayDate)) {
             // update account status
             this.status = SavingsAccountStatusType.MATURED.getValue();
@@ -315,15 +318,18 @@ public class FixedDepositAccount extends SavingsAccount {
         final Collection<Long> interestPostTransactions = this.savingsHelper.fetchPostInterestTransactionIds(getId());
         boolean isInterestTransfer = false;
         final Money minBalanceForInterestCalculation = Money.of(getCurrency(), minBalanceForInterestCalculation());
+        List<SavingsAccountTransactionDetailsForPostingPeriod> savingsAccountTransactionDetailsForPostingPeriodList = toSavingsAccountTransactionDetailsForPostingPeriodList(
+                transactions);
         for (final LocalDateInterval periodInterval : postingPeriodIntervals) {
             boolean isUserPosting = false;
             if (postedAsOnTransactionDates.contains(periodInterval.endDate())) {
                 isUserPosting = true;
             }
-            final PostingPeriod postingPeriod = PostingPeriod.createFrom(periodInterval, periodStartingBalance, transactions, this.currency,
-                    compoundingPeriodType, interestCalculationType, interestRateAsFraction, daysInYearType.getValue(), maturityDate,
-                    interestPostTransactions, isInterestTransfer, minBalanceForInterestCalculation,
-                    isSavingsInterestPostingAtCurrentPeriodEnd, isUserPosting, financialYearBeginningMonth);
+            final PostingPeriod postingPeriod = PostingPeriod.createFrom(periodInterval, periodStartingBalance,
+                    savingsAccountTransactionDetailsForPostingPeriodList, this.currency, compoundingPeriodType, interestCalculationType,
+                    interestRateAsFraction, daysInYearType.getValue(), maturityDate, interestPostTransactions, isInterestTransfer,
+                    minBalanceForInterestCalculation, isSavingsInterestPostingAtCurrentPeriodEnd, isUserPosting,
+                    financialYearBeginningMonth);
 
             periodStartingBalance = postingPeriod.closingBalance();
 
@@ -386,7 +392,7 @@ public class FixedDepositAccount extends SavingsAccount {
                 throw new PlatformApiDataValidationException(dataValidationErrors);
             }
         }
-        final List<SavingsAccountTransaction> savingsAccountTransactions = retreiveListOfTransactions();
+        final List<SavingsAccountTransaction> savingsAccountTransactions = retrieveListOfTransactions();
         if (savingsAccountTransactions.size() > 0) {
             final SavingsAccountTransaction accountTransaction = savingsAccountTransactions.get(savingsAccountTransactions.size() - 1);
             if (accountTransaction.isAfter(closedDate)) {
@@ -420,7 +426,7 @@ public class FixedDepositAccount extends SavingsAccount {
         this.rejectedBy = null;
         this.withdrawnOnDate = null;
         this.withdrawnBy = null;
-        this.closedOnDate = Date.from(closedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        this.closedOnDate = closedDate;
         this.closedBy = currentUser;
         this.summary.updateSummary(this.currency, this.savingsAccountTransactionSummaryWrapper, this.transactions);
     }
@@ -471,7 +477,7 @@ public class FixedDepositAccount extends SavingsAccount {
             }
         }
 
-        final List<SavingsAccountTransaction> savingsAccountTransactions = retreiveListOfTransactions();
+        final List<SavingsAccountTransaction> savingsAccountTransactions = retrieveListOfTransactions();
         if (savingsAccountTransactions.size() > 0) {
             final SavingsAccountTransaction accountTransaction = savingsAccountTransactions.get(savingsAccountTransactions.size() - 1);
             if (accountTransaction.isAfter(closedDate)) {
@@ -508,7 +514,7 @@ public class FixedDepositAccount extends SavingsAccount {
         this.rejectedBy = null;
         this.withdrawnOnDate = null;
         this.withdrawnBy = null;
-        this.closedOnDate = Date.from(closedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        this.closedOnDate = closedDate;
         this.closedBy = currentUser;
         // this.summary.updateSummary(this.currency,
         // this.savingsAccountTransactionSummaryWrapper, this.transactions);
@@ -528,8 +534,10 @@ public class FixedDepositAccount extends SavingsAccount {
         final boolean isInterestTransfer = false;
         final LocalDate postInterestOnDate = null;
         final boolean backdatedTxnsAllowedTill = false;
+        boolean postReversals = false;
         final List<PostingPeriod> postingPeriods = calculateInterestUsing(mc, interestPostingUpToDate, isInterestTransfer,
-                isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth, postInterestOnDate, backdatedTxnsAllowedTill);
+                isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth, postInterestOnDate, backdatedTxnsAllowedTill,
+                postReversals);
 
         Money interestPostedToDate = Money.zero(this.currency);
 
@@ -568,7 +576,7 @@ public class FixedDepositAccount extends SavingsAccount {
         if (recalucateDailyBalanceDetails) {
             // update existing transactions so derived balance fields are
             // correct.
-            recalculateDailyBalances(Money.zero(this.currency), interestPostingUpToDate, backdatedTxnsAllowedTill);
+            recalculateDailyBalances(Money.zero(this.currency), interestPostingUpToDate, backdatedTxnsAllowedTill, postReversals);
         }
 
         this.summary.updateSummary(this.currency, this.savingsAccountTransactionSummaryWrapper, this.transactions);
@@ -597,11 +605,11 @@ public class FixedDepositAccount extends SavingsAccount {
         }
 
         recalucateDailyBalance = applyWithholdTaxForDepositAccounts(accountCloseDate, recalucateDailyBalance, backdatedTxnsAllowedTill);
-
+        boolean postReversals = false;
         if (recalucateDailyBalance) {
             // update existing transactions so derived balance fields are
             // correct.
-            recalculateDailyBalances(Money.zero(this.currency), accountCloseDate, backdatedTxnsAllowedTill);
+            recalculateDailyBalances(Money.zero(this.currency), accountCloseDate, backdatedTxnsAllowedTill, postReversals);
         }
         this.summary.updateSummary(this.currency, this.savingsAccountTransactionSummaryWrapper, this.transactions);
         this.accountTermAndPreClosure.updateMaturityDetails(this.getAccountBalance(), accountCloseDate);
@@ -639,22 +647,22 @@ public class FixedDepositAccount extends SavingsAccount {
         return interestOnMaturity;
     }
 
-    @Override
     public void postInterest(final MathContext mc, final LocalDate postingDate, boolean isInterestTransfer,
             final boolean isSavingsInterestPostingAtCurrentPeriodEnd, final Integer financialYearBeginningMonth,
             final LocalDate postInterestOnDate, final boolean backdatedTxnsAllowedTill) {
         final LocalDate interestPostingUpToDate = interestPostingUpToDate(postingDate);
+        boolean postReversals = false;
         super.postInterest(mc, interestPostingUpToDate, isInterestTransfer, isSavingsInterestPostingAtCurrentPeriodEnd,
-                financialYearBeginningMonth, postInterestOnDate, backdatedTxnsAllowedTill);
+                financialYearBeginningMonth, postInterestOnDate, backdatedTxnsAllowedTill, postReversals);
     }
 
     @Override
     public List<PostingPeriod> calculateInterestUsing(final MathContext mc, final LocalDate postingDate, boolean isInterestTransfer,
             final boolean isSavingsInterestPostingAtCurrentPeriodEnd, final Integer financialYearBeginningMonth,
-            final LocalDate postAsInterestOn, final boolean backdatedTxnsAllowedTill) {
+            final LocalDate postAsInterestOn, final boolean backdatedTxnsAllowedTill, final boolean postReversals) {
         final LocalDate interestPostingUpToDate = interestPostingUpToDate(postingDate);
         return super.calculateInterestUsing(mc, interestPostingUpToDate, isInterestTransfer, isSavingsInterestPostingAtCurrentPeriodEnd,
-                financialYearBeginningMonth, postAsInterestOn, backdatedTxnsAllowedTill);
+                financialYearBeginningMonth, postAsInterestOn, backdatedTxnsAllowedTill, postReversals);
     }
 
     private LocalDate interestPostingUpToDate(final LocalDate interestPostingDate) {
@@ -763,7 +771,7 @@ public class FixedDepositAccount extends SavingsAccount {
         if (this.chart != null) {
             final LocalDate chartFromDate = this.chart.getFromDateAsLocalDate();
             LocalDate chartEndDate = this.chart.getEndDateAsLocalDate();
-            chartEndDate = chartEndDate == null ? DateUtils.getLocalDateOfTenant() : chartEndDate;
+            chartEndDate = chartEndDate == null ? DateUtils.getBusinessLocalDate() : chartEndDate;
 
             final LocalDateInterval chartInterval = LocalDateInterval.create(chartFromDate, chartEndDate);
             if (!chartInterval.contains(accountSubmittedOrActivationDate())) {

@@ -42,6 +42,8 @@ import org.apache.fineract.client.services.AdhocQueryApiApi;
 import org.apache.fineract.client.services.AuditsApi;
 import org.apache.fineract.client.services.AuthenticationHttpBasicApi;
 import org.apache.fineract.client.services.BatchApiApi;
+import org.apache.fineract.client.services.BusinessDateManagementApi;
+import org.apache.fineract.client.services.BusinessStepConfigurationApi;
 import org.apache.fineract.client.services.CacheApi;
 import org.apache.fineract.client.services.CashierJournalsApi;
 import org.apache.fineract.client.services.CashiersApi;
@@ -50,6 +52,7 @@ import org.apache.fineract.client.services.ChargesApi;
 import org.apache.fineract.client.services.ClientApi;
 import org.apache.fineract.client.services.ClientChargesApi;
 import org.apache.fineract.client.services.ClientIdentifierApi;
+import org.apache.fineract.client.services.ClientSearchV2Api;
 import org.apache.fineract.client.services.ClientTransactionApi;
 import org.apache.fineract.client.services.ClientsAddressApi;
 import org.apache.fineract.client.services.CodeValuesApi;
@@ -57,9 +60,12 @@ import org.apache.fineract.client.services.CodesApi;
 import org.apache.fineract.client.services.CurrencyApi;
 import org.apache.fineract.client.services.DataTablesApi;
 import org.apache.fineract.client.services.DefaultApi;
+import org.apache.fineract.client.services.DelinquencyRangeAndBucketsManagementApi;
 import org.apache.fineract.client.services.DocumentsApiFixed;
 import org.apache.fineract.client.services.EntityDataTableApi;
 import org.apache.fineract.client.services.EntityFieldConfigurationApi;
+import org.apache.fineract.client.services.ExternalAssetOwnersApi;
+import org.apache.fineract.client.services.ExternalEventConfigurationApi;
 import org.apache.fineract.client.services.ExternalServicesApi;
 import org.apache.fineract.client.services.FetchAuthenticatedUserDetailsApi;
 import org.apache.fineract.client.services.FixedDepositAccountApi;
@@ -76,14 +82,15 @@ import org.apache.fineract.client.services.InterestRateSlabAKAInterestBandsApi;
 import org.apache.fineract.client.services.JournalEntriesApi;
 import org.apache.fineract.client.services.ListReportMailingJobHistoryApi;
 import org.apache.fineract.client.services.LoanChargesApi;
+import org.apache.fineract.client.services.LoanCobCatchUpApi;
 import org.apache.fineract.client.services.LoanCollateralApi;
+import org.apache.fineract.client.services.LoanDisbursementDetailsApi;
 import org.apache.fineract.client.services.LoanProductsApi;
 import org.apache.fineract.client.services.LoanReschedulingApi;
 import org.apache.fineract.client.services.LoanTransactionsApi;
 import org.apache.fineract.client.services.LoansApi;
 import org.apache.fineract.client.services.MakerCheckerOr4EyeFunctionalityApi;
 import org.apache.fineract.client.services.MappingFinancialActivitiesToAccountsApi;
-import org.apache.fineract.client.services.MifosxBatchJobsApi;
 import org.apache.fineract.client.services.MixMappingApi;
 import org.apache.fineract.client.services.MixReportApi;
 import org.apache.fineract.client.services.MixTaxonomyApi;
@@ -103,6 +110,7 @@ import org.apache.fineract.client.services.RecurringDepositAccountTransactionsAp
 import org.apache.fineract.client.services.RecurringDepositProductApi;
 import org.apache.fineract.client.services.ReportMailingJobsApi;
 import org.apache.fineract.client.services.ReportsApi;
+import org.apache.fineract.client.services.RescheduleLoansApi;
 import org.apache.fineract.client.services.RolesApi;
 import org.apache.fineract.client.services.RunReportsApi;
 import org.apache.fineract.client.services.SavingsAccountApi;
@@ -110,6 +118,7 @@ import org.apache.fineract.client.services.SavingsAccountTransactionsApi;
 import org.apache.fineract.client.services.SavingsChargesApi;
 import org.apache.fineract.client.services.SavingsProductApi;
 import org.apache.fineract.client.services.SchedulerApi;
+import org.apache.fineract.client.services.SchedulerJobApi;
 import org.apache.fineract.client.services.ScoreCardApi;
 import org.apache.fineract.client.services.SearchApiApi;
 import org.apache.fineract.client.services.SelfAccountTransferApi;
@@ -140,11 +149,13 @@ import org.apache.fineract.client.services.UserGeneratedDocumentsApi;
 import org.apache.fineract.client.services.UsersApi;
 import org.apache.fineract.client.services.WorkingDaysApi;
 import org.apache.fineract.client.util.JSON.GsonCustomConverterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import retrofit2.Retrofit;
 import retrofit2.converter.scalars.ScalarsConverterFactory;
 
 /**
- * Fineract Client Java SDK API entry point. Use this instead of the {@link ApiClient}.
+ * Fineract Client Java SDK API entry point.
  *
  * @author Michael Vorburger.ch
  */
@@ -170,12 +181,16 @@ public final class FineractClient {
     public final AuditsApi audits;
     public final AuthenticationHttpBasicApi authentication;
     public final BatchApiApi batches;
+    public final BusinessDateManagementApi businessDateManagement;
+    public final BusinessStepConfigurationApi businessStepConfiguration;
     public final CacheApi caches;
     public final CashierJournalsApi cashiersJournal;
     public final CashiersApi cashiers;
     public final CentersApi centers;
     public final ChargesApi charges;
     public final ClientApi clients;
+
+    public final ClientSearchV2Api clientSearchV2;
     public final ClientChargesApi clientCharges;
     public final ClientIdentifierApi clientIdentifiers;
     public final ClientsAddressApi clientAddresses;
@@ -186,8 +201,10 @@ public final class FineractClient {
     public final DataTablesApi dataTables;
     public final @Deprecated DefaultApi legacy; // TODO FINERACT-1222
     public final DocumentsApiFixed documents;
+    public final DelinquencyRangeAndBucketsManagementApi delinquencyRangeAndBucketsManagement;
     public final EntityDataTableApi entityDatatableChecks;
     public final EntityFieldConfigurationApi entityFieldConfigurations;
+    public final ExternalEventConfigurationApi externalEventConfigurationApi;
     public final ExternalServicesApi externalServices;
     public final FetchAuthenticatedUserDetailsApi userDetails;
     public final FixedDepositAccountApi fixedDepositAccounts;
@@ -204,14 +221,15 @@ public final class FineractClient {
     public final JournalEntriesApi journalEntries;
     public final ListReportMailingJobHistoryApi reportMailings;
     public final LoanChargesApi loanCharges;
+    public final LoanCobCatchUpApi loanCobCatchUpApi;
     public final LoanCollateralApi loanCollaterals;
     public final LoanProductsApi loanProducts;
     public final LoanReschedulingApi loanSchedules;
     public final LoansApi loans;
+    public final LoanDisbursementDetailsApi loanDisbursementDetails;
     public final LoanTransactionsApi loanTransactions;
     public final MakerCheckerOr4EyeFunctionalityApi makerCheckers;
     public final MappingFinancialActivitiesToAccountsApi financialActivyAccountMappings;
-    public final MifosxBatchJobsApi jobs;
     public final MixMappingApi mixMappings;
     public final MixReportApi mixReports;
     public final MixTaxonomyApi mixTaxonomies;
@@ -231,6 +249,7 @@ public final class FineractClient {
     public final RecurringDepositProductApi recurringDepositProducts;
     public final ReportMailingJobsApi reportMailingJobs;
     public final ReportsApi reports;
+    public final RescheduleLoansApi rescheduleLoans;
     public final RolesApi roles;
     public final RunReportsApi reportsRun;
     public final SavingsAccountApi savingsAccounts;
@@ -238,6 +257,7 @@ public final class FineractClient {
     public final SavingsProductApi savingsProducts;
     public final SavingsAccountTransactionsApi savingsTransactions;
     public final SchedulerApi jobsScheduler;
+    public final SchedulerJobApi jobs;
     public final ScoreCardApi surveyScorecards;
     public final SearchApiApi search;
     public final SelfAccountTransferApi selfAccountTransfers;
@@ -268,10 +288,13 @@ public final class FineractClient {
     public final UsersApi users;
     public final WorkingDaysApi workingDays;
 
+    public final ExternalAssetOwnersApi externalAssetOwners;
+
     private FineractClient(OkHttpClient okHttpClient, Retrofit retrofit) {
         this.okHttpClient = okHttpClient;
         this.retrofit = retrofit;
 
+        externalAssetOwners = retrofit.create(ExternalAssetOwnersApi.class);
         glClosures = retrofit.create(AccountingClosureApi.class);
         accountingRules = retrofit.create(AccountingRulesApi.class);
         accountNumberFormats = retrofit.create(AccountNumberFormatApi.class);
@@ -280,12 +303,16 @@ public final class FineractClient {
         audits = retrofit.create(AuditsApi.class);
         authentication = retrofit.create(AuthenticationHttpBasicApi.class);
         batches = retrofit.create(BatchApiApi.class);
+        businessDateManagement = retrofit.create(BusinessDateManagementApi.class);
+        businessStepConfiguration = retrofit.create(BusinessStepConfigurationApi.class);
+        externalEventConfigurationApi = retrofit.create(ExternalEventConfigurationApi.class);
         caches = retrofit.create(CacheApi.class);
         cashiersJournal = retrofit.create(CashierJournalsApi.class);
         cashiers = retrofit.create(CashiersApi.class);
         centers = retrofit.create(CentersApi.class);
         charges = retrofit.create(ChargesApi.class);
         clients = retrofit.create(ClientApi.class);
+        clientSearchV2 = retrofit.create(ClientSearchV2Api.class);
         clientCharges = retrofit.create(ClientChargesApi.class);
         clientIdentifiers = retrofit.create(ClientIdentifierApi.class);
         clientAddresses = retrofit.create(ClientsAddressApi.class);
@@ -294,6 +321,7 @@ public final class FineractClient {
         codeValues = retrofit.create(CodeValuesApi.class);
         currencies = retrofit.create(CurrencyApi.class);
         dataTables = retrofit.create(DataTablesApi.class);
+        delinquencyRangeAndBucketsManagement = retrofit.create(DelinquencyRangeAndBucketsManagementApi.class);
         legacy = retrofit.create(DefaultApi.class);
         documents = retrofit.create(DocumentsApiFixed.class);
         entityDatatableChecks = retrofit.create(EntityDataTableApi.class);
@@ -314,14 +342,16 @@ public final class FineractClient {
         journalEntries = retrofit.create(JournalEntriesApi.class);
         reportMailings = retrofit.create(ListReportMailingJobHistoryApi.class);
         loanCharges = retrofit.create(LoanChargesApi.class);
+        loanCobCatchUpApi = retrofit.create(LoanCobCatchUpApi.class);
         loanCollaterals = retrofit.create(LoanCollateralApi.class);
         loanProducts = retrofit.create(LoanProductsApi.class);
         loanSchedules = retrofit.create(LoanReschedulingApi.class);
         loans = retrofit.create(LoansApi.class);
+        loanDisbursementDetails = retrofit.create(LoanDisbursementDetailsApi.class);
         loanTransactions = retrofit.create(LoanTransactionsApi.class);
         makerCheckers = retrofit.create(MakerCheckerOr4EyeFunctionalityApi.class);
         financialActivyAccountMappings = retrofit.create(MappingFinancialActivitiesToAccountsApi.class);
-        jobs = retrofit.create(MifosxBatchJobsApi.class);
+        jobs = retrofit.create(SchedulerJobApi.class);
         mixMappings = retrofit.create(MixMappingApi.class);
         mixReports = retrofit.create(MixReportApi.class);
         mixTaxonomies = retrofit.create(MixTaxonomyApi.class);
@@ -341,6 +371,7 @@ public final class FineractClient {
         recurringDepositProducts = retrofit.create(RecurringDepositProductApi.class);
         reportMailingJobs = retrofit.create(ReportMailingJobsApi.class);
         reports = retrofit.create(ReportsApi.class);
+        rescheduleLoans = retrofit.create(RescheduleLoansApi.class);
         roles = retrofit.create(RolesApi.class);
         reportsRun = retrofit.create(RunReportsApi.class);
         savingsAccounts = retrofit.create(SavingsAccountApi.class);
@@ -402,6 +433,8 @@ public final class FineractClient {
     }
 
     public static final class Builder {
+
+        private static final Logger log = LoggerFactory.getLogger(Builder.class);
 
         private final JSON json = new JSON();
         private final OkHttpClient.Builder okBuilder = new OkHttpClient.Builder();
@@ -485,14 +518,22 @@ public final class FineractClient {
             retrofitBuilder.baseUrl(has("baseURL", baseURL));
 
             // Tenant
-            ApiKeyAuth tenantAuth = new ApiKeyAuth("header", "fineract-platform-tenantid");
-            tenantAuth.setApiKey(has("tenant", tenant));
-            okBuilder.addInterceptor(tenantAuth);
+            if (tenant != null) {
+                ApiKeyAuth tenantAuth = new ApiKeyAuth("header", "fineract-platform-tenantid");
+                tenantAuth.setApiKey(has("tenant", tenant));
+                okBuilder.addInterceptor(tenantAuth);
+            } else {
+                log.warn("Tenant hasn't been configured for the client");
+            }
 
             // BASIC Auth
-            HttpBasicAuth basicAuth = new HttpBasicAuth();
-            basicAuth.setCredentials(has("username", username), has("password", password));
-            okBuilder.addInterceptor(basicAuth);
+            if (username != null && password != null) {
+                HttpBasicAuth basicAuth = new HttpBasicAuth();
+                basicAuth.setCredentials(has("username", username), has("password", password));
+                okBuilder.addInterceptor(basicAuth);
+            } else {
+                log.warn("Username and password haven't been configured for the client");
+            }
 
             OkHttpClient okHttpClient = okBuilder.build();
             retrofitBuilder.client(okHttpClient);
@@ -504,7 +545,6 @@ public final class FineractClient {
          * Obtain the internal Retrofit Builder. This method is typically not required to be invoked for simple API
          * usages, but can be a handy back door for non-trivial advanced customizations of the API client.
          *
-         * @return the {@link ApiClient} which {@link #build()} will use.
          */
         public retrofit2.Retrofit.Builder getRetrofitBuilder() {
             return retrofitBuilder;
@@ -514,7 +554,6 @@ public final class FineractClient {
          * Obtain the internal OkHttp Builder. This method is typically not required to be invoked for simple API
          * usages, but can be a handy back door for non-trivial advanced customizations of the API client.
          *
-         * @return the {@link ApiClient} which {@link #build()} will use.
          */
         public okhttp3.OkHttpClient.Builder getOkBuilder() {
             return okBuilder;

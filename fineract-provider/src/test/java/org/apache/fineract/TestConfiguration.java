@@ -18,25 +18,36 @@
  */
 package org.apache.fineract;
 
+import static org.mockito.Mockito.RETURNS_MOCKS;
 import static org.mockito.Mockito.mock;
 
 import com.zaxxer.hikari.HikariDataSource;
+import java.util.List;
 import javax.sql.DataSource;
+import liquibase.change.custom.CustomTaskChange;
 import org.apache.fineract.infrastructure.core.config.FineractProperties;
 import org.apache.fineract.infrastructure.core.domain.FineractPlatformTenant;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseIndependentQueryService;
+import org.apache.fineract.infrastructure.core.service.database.DatabasePasswordEncryptor;
 import org.apache.fineract.infrastructure.core.service.migration.ExtendedSpringLiquibaseFactory;
 import org.apache.fineract.infrastructure.core.service.migration.TenantDataSourceFactory;
 import org.apache.fineract.infrastructure.core.service.migration.TenantDatabaseStateVerifier;
 import org.apache.fineract.infrastructure.core.service.migration.TenantDatabaseUpgradeService;
+import org.apache.fineract.infrastructure.core.service.tenant.TenantDetailsService;
+import org.apache.fineract.infrastructure.jobs.ScheduledJobRunnerConfig;
 import org.apache.fineract.infrastructure.jobs.service.JobRegisterService;
-import org.apache.fineract.infrastructure.security.service.TenantDetailsService;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.batch.core.configuration.ListableJobLocator;
+import org.springframework.batch.core.explore.JobExplorer;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration;
 import org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
@@ -48,6 +59,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -60,24 +74,37 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @Configuration
 @EnableAutoConfiguration(exclude = { DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class,
         DataSourceTransactionManagerAutoConfiguration.class, GsonAutoConfiguration.class, JdbcTemplateAutoConfiguration.class,
-        LiquibaseAutoConfiguration.class })
+        LiquibaseAutoConfiguration.class, BatchAutoConfiguration.class })
 @EnableTransactionManagement
 @EnableWebSecurity
 @EnableConfigurationProperties({ FineractProperties.class, LiquibaseProperties.class })
-@ComponentScan(basePackages = "org.apache.fineract")
+@ComponentScan(basePackages = "org.apache.fineract", excludeFilters = {
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = ScheduledJobRunnerConfig.class) })
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestConfiguration {
 
     @Bean
-    public TenantDataSourceFactory tenantDataSourceFactory() {
-        return new TenantDataSourceFactory(null) {
+    public TenantDataSourceFactory tenantDataSourceFactory(DatabasePasswordEncryptor databasePasswordEncryptor) {
+        return new TenantDataSourceFactory(null, databasePasswordEncryptor) {
 
             @Override
             public DataSource create(FineractPlatformTenant tenant) {
                 return mock(DataSource.class);
             }
         };
+    }
+
+    @Primary
+    @Bean
+    public JobExplorer jobExplorer() {
+        return mock(JobExplorer.class, RETURNS_MOCKS);
+    }
+
+    @Primary
+    @Bean
+    public JobLauncher jobLauncher() {
+        return mock(JobLauncher.class, RETURNS_MOCKS);
     }
 
     @Bean
@@ -102,8 +129,8 @@ public class TestConfiguration {
 
     @Bean
     public TenantDatabaseStateVerifier tenantDatabaseStateVerifier(DatabaseIndependentQueryService databaseIndependentQueryService,
-            LiquibaseProperties liquibaseProperties, FineractProperties fineractProperties) {
-        return new TenantDatabaseStateVerifier(liquibaseProperties, databaseIndependentQueryService, fineractProperties);
+            LiquibaseProperties liquibaseProperties) {
+        return new TenantDatabaseStateVerifier(liquibaseProperties, databaseIndependentQueryService);
     }
 
     /**
@@ -114,9 +141,10 @@ public class TestConfiguration {
     public TenantDatabaseUpgradeService tenantDatabaseUpgradeService(TenantDetailsService tenantDetailsService,
             HikariDataSource tenantDataSource, TenantDatabaseStateVerifier tenantDatabaseStateVerifier,
             ExtendedSpringLiquibaseFactory liquibaseFactory, TenantDataSourceFactory tenantDataSourceFactory,
-            FineractProperties fineractProperties) {
+            FineractProperties fineractProperties, Environment environment,
+            List<CustomTaskChange> customTaskChangesForDependencyInjection) {
         return new TenantDatabaseUpgradeService(tenantDetailsService, tenantDataSource, fineractProperties, tenantDatabaseStateVerifier,
-                liquibaseFactory, tenantDataSourceFactory);
+                liquibaseFactory, tenantDataSourceFactory, environment, customTaskChangesForDependencyInjection);
     }
 
     /**
@@ -141,5 +169,23 @@ public class TestConfiguration {
     @Bean
     public JdbcTemplate jdbcTemplate() {
         return mock(JdbcTemplate.class);
+    }
+
+    @Primary
+    @Bean
+    public ListableJobLocator listableJobLocator() {
+        return mock(ListableJobLocator.class, RETURNS_MOCKS);
+    }
+
+    @Primary
+    @Bean
+    public JobRepository jobRepository() {
+        return mock(JobRepository.class, RETURNS_MOCKS);
+    }
+
+    @Primary
+    @Bean
+    public JobOperator jobOperator() {
+        return mock(JobOperator.class, RETURNS_MOCKS);
     }
 }

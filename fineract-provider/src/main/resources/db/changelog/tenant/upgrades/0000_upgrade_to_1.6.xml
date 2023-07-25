@@ -138,6 +138,7 @@
             <column defaultValueComputed="NULL" name="transaction_id"/>
         </createIndex>
         <addForeignKeyConstraint baseColumnNames="collateral_id" baseTableName="m_client_collateral_management"
+<<<<<<< HEAD
                                  constraintName="fkCollateral" deferrable="false" initiallyDeferred="false"
                                  onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
                                  referencedTableName="m_collateral_management" validate="true"/>
@@ -161,6 +162,31 @@
                                  constraintName="fkTransaction" deferrable="false" initiallyDeferred="false"
                                  onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
                                  referencedTableName="m_loan_transaction" validate="true"/>
+=======
+                constraintName="fkCollateral" deferrable="false" initiallyDeferred="false"
+                onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
+                referencedTableName="m_collateral_management" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="currency" baseTableName="m_collateral_management"
+                constraintName="fkCurrencyCode" deferrable="false" initiallyDeferred="false"
+                onDelete="CASCADE" onUpdate="RESTRICT" referencedColumnNames="id"
+                referencedTableName="m_currency" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="client_id" baseTableName="m_client_collateral_management"
+                constraintName="fkClient" deferrable="false" initiallyDeferred="false"
+                onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
+                referencedTableName="m_client" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="client_collateral_id" baseTableName="m_loan_collateral_management"
+                constraintName="fkClientCollateral" deferrable="false" initiallyDeferred="false"
+                onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
+                referencedTableName="m_client_collateral_management" validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="loan_id" baseTableName="m_loan_collateral_management"
+                constraintName="fkLoan" deferrable="false" initiallyDeferred="false" onDelete="CASCADE"
+                onUpdate="CASCADE" referencedColumnNames="id" referencedTableName="m_loan"
+                validate="true"/>
+        <addForeignKeyConstraint baseColumnNames="transaction_id" baseTableName="m_loan_collateral_management"
+                constraintName="fkTransaction" deferrable="false" initiallyDeferred="false"
+                onDelete="CASCADE" onUpdate="CASCADE" referencedColumnNames="id"
+                referencedTableName="m_loan_transaction" validate="true"/>
+>>>>>>> develop
         <insert tableName="m_permission">
             <column name="grouping" value="portfolio"/>
             <column name="code" value="CREATE_CLIENT_COLLATERAL_PRODUCT"/>
@@ -291,35 +317,59 @@
     <changeSet author="fineract" id="371">
         <addColumn tableName="m_loan">
             <column name="net_disbursal_amount"
+<<<<<<< HEAD
                     type="DECIMAL(19, 6)">
+=======
+                type="DECIMAL(19, 6)">
+>>>>>>> develop
                 <constraints nullable="false" />
             </column>
         </addColumn>
         <addColumn tableName="m_loan_disbursement_detail">
             <column name="net_disbursal_amount"
+<<<<<<< HEAD
                     type="DECIMAL(19, 6)" defaultValueComputed="NULL" />
+=======
+                type="DECIMAL(19, 6)" defaultValueComputed="NULL" />
+>>>>>>> develop
         </addColumn>
     </changeSet>
     <!-- V372__fixed_principal_percentage.sql -->
     <changeSet author="fineract" id="372">
         <addColumn tableName="m_product_loan">
             <column name="fixed_principal_percentage_per_installment"
+<<<<<<< HEAD
                     type="DECIMAL(5, 2)" defaultValueComputed="NULL" />
         </addColumn>
         <addColumn tableName="m_loan">
             <column name="fixed_principal_percentage_per_installment"
                     type="DECIMAL(5, 2)" defaultValueComputed="NULL" />
+=======
+                type="DECIMAL(5, 2)" defaultValueComputed="NULL" />
+        </addColumn>
+        <addColumn tableName="m_loan">
+            <column name="fixed_principal_percentage_per_installment"
+                type="DECIMAL(5, 2)" defaultValueComputed="NULL" />
+>>>>>>> develop
         </addColumn>
     </changeSet>
     <!-- V373__node_aware_scheduler_jobs.sql -->
     <changeSet author="fineract" id="373">
         <addColumn tableName="job">
             <column name="node_id"
+<<<<<<< HEAD
                     type="INT" defaultValueComputed="1" />
         </addColumn>
         <addColumn tableName="job">
             <column name="is_mismatched_job"
                     type="boolean" defaultValueBoolean="true" />
+=======
+                type="INT" defaultValueComputed="1" />
+        </addColumn>
+        <addColumn tableName="job">
+            <column name="is_mismatched_job"
+                type="boolean" defaultValueBoolean="true" />
+>>>>>>> develop
         </addColumn>
         <insert tableName="job">
             <column name="id" valueNumeric="31"/>
@@ -345,7 +395,11 @@
     <changeSet author="fineract" id="374">
         <addColumn tableName="c_configuration">
             <column name="string_value"
+<<<<<<< HEAD
                     type="VARCHAR(100)" defaultValueComputed="NULL" position="5"/>
+=======
+                type="VARCHAR(100)" defaultValueComputed="NULL" position="5"/>
+>>>>>>> develop
         </addColumn>
         <insert tableName="c_configuration">
             <column name="id" valueNumeric="35"/>
@@ -387,7 +441,11 @@
     <changeSet author="fineract" id="376">
         <addColumn tableName="m_savings_account">
             <column name="interest_posted_till_date"
+<<<<<<< HEAD
                     type="date" defaultValueComputed="NULL" />
+=======
+                type="date" defaultValueComputed="NULL" />
+>>>>>>> develop
         </addColumn>
         <insert tableName="c_configuration">
             <column name="id" valueNumeric="38"/>

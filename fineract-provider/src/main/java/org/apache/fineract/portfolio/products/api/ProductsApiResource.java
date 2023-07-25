@@ -26,17 +26,18 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
@@ -49,17 +50,15 @@ import org.apache.fineract.infrastructure.security.service.PlatformSecurityConte
 import org.apache.fineract.portfolio.products.constants.ProductsApiConstants;
 import org.apache.fineract.portfolio.products.data.ProductData;
 import org.apache.fineract.portfolio.products.exception.ResourceNotFoundException;
-import org.apache.fineract.portfolio.products.service.ProductReadPlatformService;
+import org.apache.fineract.portfolio.products.service.ShareProductReadPlatformService;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/products/{type}")
+@Path("/v1/products/{type}")
 @Component
-@Scope("singleton")
 @Tag(name = "Products", description = "")
+@RequiredArgsConstructor
 public class ProductsApiResource {
 
     private final ApplicationContext applicationContext;
@@ -67,17 +66,6 @@ public class ProductsApiResource {
     private final DefaultToApiJsonSerializer<ProductData> toApiJsonSerializer;
     private final PlatformSecurityContext platformSecurityContext;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
-
-    @Autowired
-    public ProductsApiResource(final ApplicationContext applicationContext, final ApiRequestParameterHelper apiRequestParameterHelper,
-            final DefaultToApiJsonSerializer<ProductData> toApiJsonSerializer, final PlatformSecurityContext platformSecurityContext,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService) {
-        this.applicationContext = applicationContext;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.platformSecurityContext = platformSecurityContext;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-    }
 
     @GET
     @Path("template")
@@ -87,7 +75,7 @@ public class ProductsApiResource {
             @Context final UriInfo uriInfo) {
         String serviceName = productType + ProductsApiConstants.READPLATFORM_NAME;
         try {
-            ProductReadPlatformService service = (ProductReadPlatformService) this.applicationContext.getBean(serviceName);
+            ShareProductReadPlatformService service = (ShareProductReadPlatformService) this.applicationContext.getBean(serviceName);
             ProductData data = service.retrieveTemplate();
             final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
             return this.toApiJsonSerializer.serialize(settings, data, service.getResponseDataParams());
@@ -108,7 +96,7 @@ public class ProductsApiResource {
             @PathParam("type") @Parameter(description = "type") final String productType, @Context final UriInfo uriInfo) {
         try {
             String serviceName = productType + ProductsApiConstants.READPLATFORM_NAME;
-            ProductReadPlatformService service = (ProductReadPlatformService) this.applicationContext.getBean(serviceName);
+            ShareProductReadPlatformService service = (ShareProductReadPlatformService) this.applicationContext.getBean(serviceName);
             final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
             ProductData data = service.retrieveOne(productId, settings.isTemplate());
             return this.toApiJsonSerializer.serialize(settings, data, service.getResponseDataParams());
@@ -129,7 +117,7 @@ public class ProductsApiResource {
             @QueryParam("limit") @Parameter(description = "limit") final Integer limit, @Context final UriInfo uriInfo) {
         try {
             String serviceName = productType + ProductsApiConstants.READPLATFORM_NAME;
-            ProductReadPlatformService service = (ProductReadPlatformService) this.applicationContext.getBean(serviceName);
+            ShareProductReadPlatformService service = (ShareProductReadPlatformService) this.applicationContext.getBean(serviceName);
             Page<ProductData> data = service.retrieveAllProducts(offset, limit);
             final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
             return this.toApiJsonSerializer.serialize(settings, data, service.getResponseDataParams());

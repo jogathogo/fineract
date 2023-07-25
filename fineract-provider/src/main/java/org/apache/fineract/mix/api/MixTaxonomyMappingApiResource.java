@@ -19,17 +19,18 @@
 package org.apache.fineract.mix.api;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
@@ -40,38 +41,21 @@ import org.apache.fineract.infrastructure.core.serialization.ToApiJsonSerializer
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.mix.data.MixTaxonomyMappingData;
 import org.apache.fineract.mix.service.MixTaxonomyMappingReadPlatformService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/mixmapping")
+@Path("/v1/mixmapping")
 @Component
-@Scope("singleton")
-
 @Tag(name = "Mix Mapping", description = "")
+@RequiredArgsConstructor
 public class MixTaxonomyMappingApiResource {
 
-    private final Set<String> responseDataParameters = new HashSet<>(Arrays.asList("identifier", "config"));
+    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(Arrays.asList("identifier", "config"));
 
     private final PlatformSecurityContext context;
     private final ToApiJsonSerializer<MixTaxonomyMappingData> toApiJsonSerializer;
     private final MixTaxonomyMappingReadPlatformService readTaxonomyMappingService;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
     private final ApiRequestParameterHelper apiRequestParameterHelper;
-
-    @Autowired
-    public MixTaxonomyMappingApiResource(final PlatformSecurityContext context,
-            final ToApiJsonSerializer<MixTaxonomyMappingData> toApiJsonSerializer,
-            final MixTaxonomyMappingReadPlatformService readTaxonomyMappingService,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService,
-            final ApiRequestParameterHelper apiRequestParameterHelper) {
-
-        this.context = context;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.readTaxonomyMappingService = readTaxonomyMappingService;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-    }
 
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -80,7 +64,7 @@ public class MixTaxonomyMappingApiResource {
         this.context.authenticatedUser();
         final MixTaxonomyMappingData mappingData = this.readTaxonomyMappingService.retrieveTaxonomyMapping();
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, mappingData, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, mappingData, RESPONSE_DATA_PARAMETERS);
     }
 
     @PUT

@@ -20,6 +20,7 @@ package org.apache.fineract.portfolio.self.loanaccount.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,22 +28,24 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.HashMap;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.exception.UnrecognizedQueryParamException;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.client.exception.ClientNotFoundException;
+import org.apache.fineract.portfolio.loanaccount.api.LoanApiConstants;
 import org.apache.fineract.portfolio.loanaccount.api.LoanChargesApiResource;
 import org.apache.fineract.portfolio.loanaccount.api.LoanTransactionsApiResource;
 import org.apache.fineract.portfolio.loanaccount.api.LoansApiResource;
@@ -54,15 +57,12 @@ import org.apache.fineract.portfolio.self.client.service.AppuserClientMapperRead
 import org.apache.fineract.portfolio.self.loanaccount.data.SelfLoansDataValidator;
 import org.apache.fineract.portfolio.self.loanaccount.service.AppuserLoansMapperReadService;
 import org.apache.fineract.useradministration.domain.AppUser;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/self/loans")
+@Path("/v1/self/loans")
 @Component
-@Scope("singleton")
-
 @Tag(name = "Self Loans", description = "")
+@RequiredArgsConstructor
 public class SelfLoansApiResource {
 
     private final PlatformSecurityContext context;
@@ -73,22 +73,6 @@ public class SelfLoansApiResource {
     private final AppuserClientMapperReadService appUserClientMapperReadService;
     private final SelfLoansDataValidator dataValidator;
     private final GuarantorsApiResource guarantorsApiResource;
-
-    @Autowired
-    public SelfLoansApiResource(final PlatformSecurityContext context, final LoansApiResource loansApiResource,
-            final LoanTransactionsApiResource loanTransactionsApiResource, final LoanChargesApiResource loanChargesApiResource,
-            final AppuserLoansMapperReadService appuserLoansMapperReadService,
-            final AppuserClientMapperReadService appUserClientMapperReadService, final SelfLoansDataValidator dataValidator,
-            final GuarantorsApiResource guarantorsApiResource) {
-        this.context = context;
-        this.loansApiResource = loansApiResource;
-        this.loanTransactionsApiResource = loanTransactionsApiResource;
-        this.loanChargesApiResource = loanChargesApiResource;
-        this.appuserLoansMapperReadService = appuserLoansMapperReadService;
-        this.appUserClientMapperReadService = appUserClientMapperReadService;
-        this.dataValidator = dataValidator;
-        this.guarantorsApiResource = guarantorsApiResource;
-    }
 
     @GET
     @Path("{loanId}")
@@ -106,7 +90,10 @@ public class SelfLoansApiResource {
         validateAppuserLoanMapping(loanId);
 
         final boolean staffInSelectedOfficeOnly = false;
-        return this.loansApiResource.retrieveLoan(loanId, staffInSelectedOfficeOnly, uriInfo);
+        final String associations = LoanApiConstants.LOAN_ASSOCIATIONS_ALL;
+        final String exclude = null;
+        final String fields = null;
+        return this.loansApiResource.retrieveLoan(loanId, staffInSelectedOfficeOnly, associations, exclude, fields, uriInfo);
     }
 
     @GET
@@ -119,13 +106,14 @@ public class SelfLoansApiResource {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SelfLoansApiResourceSwagger.GetSelfLoansLoanIdTransactionsTransactionIdResponse.class))) })
     public String retrieveTransaction(@PathParam("loanId") @Parameter(description = "loanId") final Long loanId,
             @PathParam("transactionId") @Parameter(description = "transactionId") final Long transactionId,
+            @QueryParam("fields") @Parameter(in = ParameterIn.QUERY, name = "fields", description = "Optional Loan Transaction attribute list to be in the response", required = false, example = "id,date,amount") final String fields,
             @Context final UriInfo uriInfo) {
 
         this.dataValidator.validateRetrieveTransaction(uriInfo);
 
         validateAppuserLoanMapping(loanId);
 
-        return this.loanTransactionsApiResource.retrieveTransaction(loanId, transactionId, uriInfo);
+        return this.loanTransactionsApiResource.retrieveTransaction(loanId, transactionId, fields, uriInfo);
     }
 
     @GET
@@ -199,9 +187,9 @@ public class SelfLoansApiResource {
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Calculate Loan Repayment Schedule | Submit a new Loan Application", description = "Calculate Loan Repayment Schedule:\n\n"
             + "Calculates Loan Repayment Schedule\n\n"
-            + "Mandatory Fields: productId, principal, loanTermFrequency, loanTermFrequencyType, numberOfRepayments, repaymentEvery, repaymentFrequencyType, interestRatePerPeriod, amortizationType, interestType, interestCalculationPeriodType, expectedDisbursementDate, transactionProcessingStrategyId\n\n"
+            + "Mandatory Fields: productId, principal, loanTermFrequency, loanTermFrequencyType, numberOfRepayments, repaymentEvery, repaymentFrequencyType, interestRatePerPeriod, amortizationType, interestType, interestCalculationPeriodType, expectedDisbursementDate, transactionProcessingStrategyCode\n\n"
             + "Submit a new Loan Application:\n\n"
-            + "Mandatory Fields: clientId, productId, principal, loanTermFrequency, loanTermFrequencyType, loanType, numberOfRepayments, repaymentEvery, repaymentFrequencyType, interestRatePerPeriod, amortizationType, interestType, interestCalculationPeriodType, transactionProcessingStrategyId, expectedDisbursementDate, submittedOnDate, loanType\n\n"
+            + "Mandatory Fields: clientId, productId, principal, loanTermFrequency, loanTermFrequencyType, loanType, numberOfRepayments, repaymentEvery, repaymentFrequencyType, interestRatePerPeriod, amortizationType, interestType, interestCalculationPeriodType, transactionProcessingStrategyCode, expectedDisbursementDate, submittedOnDate, loanType\n\n"
             + "Additional Mandatory Fields if interest recalculation is enabled for product and Rest frequency not same as repayment period: recalculationRestFrequencyDate\n\n"
             + "Additional Mandatory Fields if interest recalculation with interest/fee compounding is enabled for product and compounding frequency not same as repayment period: recalculationCompoundingFrequencyDate\n\n"
             + "Additional Mandatory Field if Entity-Datatable Check is enabled for the entity of type loan: datatables\n\n"
@@ -238,8 +226,8 @@ public class SelfLoansApiResource {
         if (clientId != null) {
             validateAppuserClientsMapping(clientId);
         }
-
-        return this.loansApiResource.modifyLoanApplication(loanId, apiRequestBodyAsJson);
+        final String command = null;
+        return this.loansApiResource.modifyLoanApplication(loanId, command, apiRequestBodyAsJson);
     }
 
     @POST

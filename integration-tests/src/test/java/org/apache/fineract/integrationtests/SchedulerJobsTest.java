@@ -22,28 +22,31 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.restassured.builder.RequestSpecBuilder;
+import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
+import io.restassured.specification.ResponseSpecification;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.fineract.infrastructure.jobs.service.JobName;
+import org.apache.fineract.integrationtests.common.GlobalConfigurationHelper;
 import org.apache.fineract.integrationtests.common.SchedulerJobHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 @Order(1)
 public class SchedulerJobsTest {
 
+    private final Map<Integer, Boolean> originalJobStatus = new HashMap<>();
     private RequestSpecification requestSpec;
     private SchedulerJobHelper schedulerJobHelper;
     private Boolean originalSchedulerStatus;
-    private final Map<Integer, Boolean> originalJobStatus = new HashMap<>();
 
     @BeforeEach
     public void setup() {
@@ -63,7 +66,7 @@ public class SchedulerJobsTest {
     @AfterEach
     public void tearDown() {
         schedulerJobHelper.updateSchedulerStatus(originalSchedulerStatus);
-        for (int jobId = 1; jobId < JobName.values().length; jobId++) {
+        for (Integer jobId : schedulerJobHelper.getAllSchedulerJobIds()) {
             schedulerJobHelper.updateSchedulerJob(jobId, originalJobStatus.get(jobId));
         }
     }
@@ -74,14 +77,14 @@ public class SchedulerJobsTest {
         // is a
         // java.util.Date)
         schedulerJobHelper.updateSchedulerStatus(true);
-        schedulerJobHelper.updateSchedulerJob(1, true);
-        String nextRunTimeText = await().until(() -> (String) schedulerJobHelper.getSchedulerJobById(1).get("nextRunTime"),
-                nextRunTime -> nextRunTime != null);
+        int minJobId = schedulerJobHelper.getAllSchedulerJobIds().stream().mapToInt(number -> number).min().orElse(Integer.MAX_VALUE);
+        schedulerJobHelper.updateSchedulerJob(minJobId, true);
+        String nextRunTimeText = await().until(() -> (String) schedulerJobHelper.getSchedulerJobById(minJobId).get("nextRunTime"),
+                Objects::nonNull);
         DateTimeFormatter.ISO_INSTANT.parse(nextRunTimeText);
     }
 
     @Test
-    @Disabled // TODO FINERACT-1167
     public void testFlippingSchedulerStatus() throws InterruptedException {
         // Retrieving Status of Scheduler
         Boolean schedulerStatus = schedulerJobHelper.getSchedulerStatus();
@@ -132,8 +135,14 @@ public class SchedulerJobsTest {
 
     @Test
     public void testTriggeringManualExecutionOfAllSchedulerJobs() {
-        for (String jobName : schedulerJobHelper.getAllSchedulerJobNames()) {
-            schedulerJobHelper.executeAndAwaitJob(jobName);
+        ResponseSpecification responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
+        try {
+            GlobalConfigurationHelper.updateIsBusinessDateEnabled(requestSpec, responseSpec, Boolean.TRUE);
+            for (String jobName : schedulerJobHelper.getAllSchedulerJobNames()) {
+                schedulerJobHelper.executeAndAwaitJob(jobName);
+            }
+        } finally {
+            GlobalConfigurationHelper.updateIsBusinessDateEnabled(requestSpec, responseSpec, Boolean.FALSE);
         }
     }
 }

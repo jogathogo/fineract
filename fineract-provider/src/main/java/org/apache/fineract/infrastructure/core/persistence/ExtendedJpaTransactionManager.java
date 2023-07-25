@@ -18,8 +18,11 @@
  */
 package org.apache.fineract.infrastructure.core.persistence;
 
-import javax.persistence.EntityManager;
-import javax.persistence.FlushModeType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import org.springframework.jdbc.datasource.JdbcTransactionObjectSupport;
 import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -28,6 +31,12 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public class ExtendedJpaTransactionManager extends JpaTransactionManager {
+
+    private final List<TransactionLifecycleCallback> lifecycleCallbacks = new CopyOnWriteArrayList<>();
+
+    public ExtendedJpaTransactionManager() {
+        setValidateExistingTransaction(true);
+    }
 
     @Override
     protected void doBegin(Object transaction, TransactionDefinition definition) {
@@ -38,7 +47,7 @@ public class ExtendedJpaTransactionManager extends JpaTransactionManager {
                 entityManager.setFlushMode(FlushModeType.COMMIT);
             }
         }
-
+        invokeLifecycleCallbacks(TransactionLifecycleCallback::afterBegin);
     }
 
     @Override
@@ -50,6 +59,13 @@ public class ExtendedJpaTransactionManager extends JpaTransactionManager {
             }
         }
         super.doCommit(status);
+        invokeLifecycleCallbacks(TransactionLifecycleCallback::afterCommit);
+    }
+
+    @Override
+    protected void doCleanupAfterCompletion(Object transaction) {
+        super.doCleanupAfterCompletion(transaction);
+        invokeLifecycleCallbacks(TransactionLifecycleCallback::afterCompletion);
     }
 
     private boolean isReadOnlyTx(Object transaction) {
@@ -63,5 +79,13 @@ public class ExtendedJpaTransactionManager extends JpaTransactionManager {
             return holder.getEntityManager();
         }
         return null;
+    }
+
+    private void invokeLifecycleCallbacks(Consumer<TransactionLifecycleCallback> f) {
+        lifecycleCallbacks.forEach(f::accept);
+    }
+
+    public void setLifecycleCallbacks(List<TransactionLifecycleCallback> lifecycleCallbacks) {
+        this.lifecycleCallbacks.addAll(lifecycleCallbacks);
     }
 }

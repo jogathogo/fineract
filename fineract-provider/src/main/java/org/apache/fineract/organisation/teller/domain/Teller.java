@@ -18,31 +18,35 @@
  */
 package org.apache.fineract.organisation.teller.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
-import javax.persistence.UniqueConstraint;
-import org.apache.commons.lang3.StringUtils;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.accounting.glaccount.domain.GLAccount;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.organisation.office.domain.Office;
 
 @Entity
 @Table(name = "m_tellers", uniqueConstraints = { @UniqueConstraint(name = "ux_tellers_name", columnNames = { "name" }) })
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Accessors(chain = true)
 public class Teller extends AbstractPersistableCustom {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -63,48 +67,17 @@ public class Teller extends AbstractPersistableCustom {
     @Column(name = "description", nullable = true, length = 500)
     private String description;
 
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "valid_from", nullable = true)
-    private Date startDate;
+    private LocalDate startDate;
 
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "valid_to", nullable = true)
-    private Date endDate;
+    private LocalDate endDate;
 
     @Column(name = "state", nullable = false)
     private Integer status;
 
     @OneToMany(mappedBy = "teller", fetch = FetchType.LAZY)
     private Set<Cashier> cashiers;
-
-    public Teller() {
-
-    }
-
-    private Teller(final Office staffOffice, final String name, final String description, final LocalDate startDate,
-            final LocalDate endDate, final TellerStatus status) {
-
-        this.name = StringUtils.defaultIfEmpty(name, null);
-        this.description = StringUtils.defaultIfEmpty(description, null);
-        if (startDate != null) {
-            this.startDate = Date.from(startDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-        }
-        if (endDate != null) {
-            this.endDate = Date.from(endDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-        }
-        if (status != null) {
-            this.status = status.getValue();
-        }
-        this.office = staffOffice;
-
-        /*
-         * if (StringUtils.isNotBlank(name)) { this.name = name.trim(); } else { this.name = null; }
-         *
-         * if (StringUtils.isNotBlank(description)) { this.description = description.trim(); } else { this.description =
-         * null; }
-         */
-
-    }
 
     public static Teller fromJson(final Office tellerOffice, final JsonCommand command) {
         final String name = command.stringValueOfParameterNamed("name");
@@ -114,7 +87,8 @@ public class Teller extends AbstractPersistableCustom {
         final Integer tellerStatusInt = command.integerValueOfParameterNamed("status");
         final TellerStatus status = TellerStatus.fromInt(tellerStatusInt);
 
-        return new Teller(tellerOffice, name, description, startDate, endDate, status);
+        return new Teller().setOffice(tellerOffice).setName(name).setDescription(description).setStartDate(startDate).setEndDate(endDate)
+                .setStatus(status.getValue());
     }
 
     public Map<String, Object> update(Office tellerOffice, final JsonCommand command) {
@@ -146,25 +120,23 @@ public class Teller extends AbstractPersistableCustom {
         }
 
         final String startDateParamName = "startDate";
-        if (command.isChangeInLocalDateParameterNamed(startDateParamName, getStartLocalDate())) {
+        if (command.isChangeInLocalDateParameterNamed(startDateParamName, this.startDate)) {
             final String valueAsInput = command.stringValueOfParameterNamed(startDateParamName);
             actualChanges.put(startDateParamName, valueAsInput);
             actualChanges.put("dateFormat", dateFormatAsInput);
             actualChanges.put("locale", localeAsInput);
 
-            final LocalDate newValue = command.localDateValueOfParameterNamed(startDateParamName);
-            this.startDate = Date.from(newValue.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            this.startDate = command.localDateValueOfParameterNamed(startDateParamName);
         }
 
         final String endDateParamName = "endDate";
-        if (command.isChangeInLocalDateParameterNamed(endDateParamName, getEndLocalDate())) {
+        if (command.isChangeInLocalDateParameterNamed(endDateParamName, this.endDate)) {
             final String valueAsInput = command.stringValueOfParameterNamed(endDateParamName);
             actualChanges.put(endDateParamName, valueAsInput);
             actualChanges.put("dateFormat", dateFormatAsInput);
             actualChanges.put("locale", localeAsInput);
 
-            final LocalDate newValue = command.localDateValueOfParameterNamed(endDateParamName);
-            this.endDate = Date.from(newValue.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            this.endDate = command.localDateValueOfParameterNamed(endDateParamName);
         }
 
         final String statusParamName = "status";
@@ -181,96 +153,8 @@ public class Teller extends AbstractPersistableCustom {
         return actualChanges;
     }
 
-    public Office getOffice() {
-        return office;
-    }
-
-    public void setOffice(Office office) {
-        this.office = office;
-    }
-
-    public GLAccount getDebitAccount() {
-        return debitAccount;
-    }
-
-    public void setDebitAccount(GLAccount debitAccount) {
-        this.debitAccount = debitAccount;
-    }
-
-    public GLAccount getCreditAccount() {
-        return creditAccount;
-    }
-
-    public void setCreditAccount(GLAccount creditAccount) {
-        this.creditAccount = creditAccount;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public Date getStartDate() {
-        return startDate;
-    }
-
-    public LocalDate getStartLocalDate() {
-        LocalDate startLocalDate = null;
-        if (this.startDate != null) {
-            startLocalDate = LocalDate.ofInstant(this.startDate.toInstant(), DateUtils.getDateTimeZoneOfTenant());
-        }
-        return startLocalDate;
-    }
-
-    public void setStartDate(Date startDate) {
-        this.startDate = startDate;
-    }
-
-    public Date getEndDate() {
-        return endDate;
-    }
-
-    public LocalDate getEndLocalDate() {
-        LocalDate endLocalDate = null;
-        if (this.endDate != null) {
-            endLocalDate = LocalDate.ofInstant(this.endDate.toInstant(), DateUtils.getDateTimeZoneOfTenant());
-        }
-        return endLocalDate;
-    }
-
-    public void setEndDate(Date endDate) {
-        this.endDate = endDate;
-    }
-
-    public Integer getStatus() {
-        return status;
-    }
-
-    public void setStatus(Integer status) {
-        this.status = status;
-    }
-
     public Long officeId() {
         return this.office.getId();
-    }
-
-    public Set<Cashier> getCashiers() {
-        return cashiers;
-    }
-
-    public void setCashiers(Set<Cashier> cashiers) {
-        this.cashiers = cashiers;
     }
 
     public void initializeLazyCollections() {

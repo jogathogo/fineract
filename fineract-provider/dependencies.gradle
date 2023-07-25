@@ -18,6 +18,9 @@
  */
 
 dependencies {
+    implementation(project(path: ':fineract-core'))
+    implementation(project(path: ':fineract-investor'))
+    implementation(project(path: ':fineract-loan'))
     providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
 
     // Never use "compile" scope, but make all dependencies either 'implementation', 'runtimeOnly' or 'testCompile'.
@@ -27,12 +30,23 @@ dependencies {
     // implementation dependencies are directly used (compiled against) in src/main (and src/test)
     //
     implementation(
+            project(path: ':fineract-avro-schemas')
+            )
+    implementation(
             'org.springframework.boot:spring-boot-starter-web',
             'org.springframework.boot:spring-boot-starter-security',
             'org.springframework.boot:spring-boot-starter-cache',
             'org.springframework.boot:spring-boot-starter-oauth2-resource-server',
+            'org.springframework.boot:spring-boot-starter-actuator',
+            'org.springframework.boot:spring-boot-starter-batch',
+            'org.springframework.batch:spring-batch-integration',
+            'org.springframework.boot:spring-boot-starter-integration',
+            'org.springframework.integration:spring-integration-event',
+            'org.springframework.integration:spring-integration-jms',
 
-            'org.glassfish.jersey.media:jersey-media-multipart:2.35',
+            'org.apache.avro:avro',
+            'jakarta.ws.rs:jakarta.ws.rs-api',
+            'org.glassfish.jersey.media:jersey-media-multipart',
 
             'org.springframework:spring-jms',
             'org.springframework:spring-context-support',
@@ -64,17 +78,20 @@ dependencies {
             'javax.cache:cache-api',
 
             'com.github.spotbugs:spotbugs-annotations',
-            'io.swagger.core.v3:swagger-annotations',
+            'io.swagger.core.v3:swagger-annotations-jakarta',
 
             'com.google.cloud.sql:mysql-socket-factory-connector-j-8',
             'com.squareup.retrofit2:converter-gson',
             'com.sun.activation:jakarta.activation',
             'com.sun.mail:jakarta.mail',
 
-            'org.springdoc:springdoc-openapi-ui',
-            'org.springdoc:springdoc-openapi-common',
-            'org.springdoc:springdoc-openapi-security',
+            'org.springdoc:springdoc-openapi-starter-webmvc-ui',
+            'org.mapstruct:mapstruct',
+
+            'io.github.resilience4j:resilience4j-spring-boot2',
             )
+
+    implementation 'io.swagger.core.v3:swagger-jaxrs2-jakarta:2.2.9'
 
     implementation ('org.apache.commons:commons-email') {
         exclude group: 'com.sun.mail', module: 'javax.mail'
@@ -93,7 +110,7 @@ dependencies {
     implementation ('jakarta.xml.bind:jakarta.xml.bind-api') {
         exclude group: 'jakarta.activation'
     }
-    implementation ('org.apache.activemq:activemq-broker') {
+    implementation ('org.apache.activemq:activemq-client-jakarta') {
         exclude group: 'org.apache.geronimo.specs'
         exclude group: 'javax.annotation', module: 'javax.annotation-api'
     }
@@ -106,9 +123,12 @@ dependencies {
     implementation ('org.quartz-scheduler:quartz') {
         exclude group: 'com.zaxxer', module: 'HikariCP-java7'
     }
-    implementation ('com.amazonaws:aws-java-sdk-s3') {
-        exclude group: 'commons-logging'
+    implementation('org.apache.commons:commons-csv'){}
+    implementation ('software.amazon.awssdk:s3') {
     }
+    implementation ('software.amazon.awssdk:auth') {
+    }
+
     implementation ('org.mnode.ical4j:ical4j') {
         exclude group: 'commons-logging'
         exclude group: 'javax.activation'
@@ -129,7 +149,6 @@ dependencies {
         exclude group: 'xml-apis'
     }
 
-
     runtimeOnly('org.glassfish.jaxb:jaxb-runtime') {
         exclude group: 'com.sun.activation'
     }
@@ -137,7 +156,6 @@ dependencies {
     // runtimeOnly dependencies are things that Fineract code has no direct compile time dependency on, but which must be present at run-time
     runtimeOnly(
             'org.apache.bval:org.apache.bval.bundle',
-            'org.springframework.boot:spring-boot-starter-actuator',
 
             // Although fineract (at the time of writing) doesn't have any compile time dep. on httpclient,
             // it's useful to have this for the Spring Boot TestRestTemplate http://docs.spring.io/spring-boot/docs/current-SNAPSHOT/reference/htmlsingle/#boot-features-rest-templates-test-utility
@@ -146,16 +164,25 @@ dependencies {
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.mapstruct:mapstruct-processor'
+
+    implementation 'ch.qos.logback.contrib:logback-json-classic'
+    implementation 'ch.qos.logback.contrib:logback-jackson'
+    implementation 'org.codehaus.janino:janino'
+
+    implementation 'org.apache.commons:commons-math3'
+
+    implementation 'io.github.classgraph:classgraph'
 
     // testCompile dependencies are ONLY used in src/test, not src/main.
     // Do NOT repeat dependencies which are ALREADY in implementation or runtimeOnly!
     //
     testImplementation( 'io.cucumber:cucumber-spring',
             'io.github.classgraph:classgraph',
-            project(':module:dummy:core'),
-            project(':module:dummy:service'),
-            project(':module:dummy:starter'),
-            project(':custom:foo:service'),
+            'io.cucumber:cucumber-core',
+            'io.cucumber:cucumber-java',
+            'io.cucumber:cucumber-java8',
+            'io.cucumber:cucumber-junit-platform-engine',
             )
     testImplementation ('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'com.jayway.jsonpath', module: 'json-path'
@@ -164,5 +191,5 @@ dependencies {
         exclude group: 'javax.activation'
         exclude group: 'org.skyscreamer'
     }
-
+    testImplementation ('org.mockito:mockito-inline')
 }

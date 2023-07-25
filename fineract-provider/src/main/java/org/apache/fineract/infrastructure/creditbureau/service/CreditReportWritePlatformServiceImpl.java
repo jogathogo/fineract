@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.infrastructure.creditbureau.service;
 
+import jakarta.persistence.PersistenceException;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -25,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import javax.persistence.PersistenceException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
@@ -34,17 +34,12 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuild
 import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
-import org.apache.fineract.infrastructure.core.serialization.FromJsonHelper;
 import org.apache.fineract.infrastructure.creditbureau.data.CreditBureauConfigurations;
 import org.apache.fineract.infrastructure.creditbureau.data.CreditBureauReportData;
 import org.apache.fineract.infrastructure.creditbureau.domain.CreditBureau;
-import org.apache.fineract.infrastructure.creditbureau.domain.CreditBureauConfigurationRepositoryWrapper;
-import org.apache.fineract.infrastructure.creditbureau.domain.CreditBureauLoanProductMappingRepository;
 import org.apache.fineract.infrastructure.creditbureau.domain.CreditBureauRepository;
 import org.apache.fineract.infrastructure.creditbureau.domain.CreditReport;
 import org.apache.fineract.infrastructure.creditbureau.domain.CreditReportRepository;
-import org.apache.fineract.infrastructure.creditbureau.domain.TokenRepositoryWrapper;
-import org.apache.fineract.infrastructure.creditbureau.serialization.CreditBureauTokenCommandFromApiJsonDeserializer;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,48 +51,35 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CreditReportWritePlatformServiceImpl implements CreditReportWritePlatformService {
 
+    public static final String CREDIT_BUREAU_INTEGRATION = "creditBureauIntegration";
+    public static final String CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED = "creditBureau.has.not.been.Integrated";
     private final PlatformSecurityContext context;
-    private final CreditBureauConfigurationRepositoryWrapper configDataRepository;
+
     private final CreditBureauRepository creditBureauRepository;
     private final CreditReportRepository creditReportRepository;
     private final ThitsaWorksCreditBureauIntegrationWritePlatformService thitsaWorksCreditBureauIntegrationWritePlatformService;
-    private final ThitsaWorksCreditBureauIntegrationWritePlatformServiceImpl thitsaWorksCreditBureauIntegrationWritePlatformServiceImpl;
-    private final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
-    private final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors)
-            .resource("creditBureauIntegration");
 
     @Autowired
-    public CreditReportWritePlatformServiceImpl(final PlatformSecurityContext context, final FromJsonHelper fromApiJsonHelper,
-            final TokenRepositoryWrapper tokenRepository, final CreditBureauConfigurationRepositoryWrapper configDataRepository,
-            final CreditBureauTokenCommandFromApiJsonDeserializer fromApiJsonDeserializer,
-            final CreditBureauLoanProductMappingRepository loanProductMappingRepository,
-            final CreditBureauRepository creditBureauRepository, final CreditReportRepository creditReportRepository,
-            final ThitsaWorksCreditBureauIntegrationWritePlatformService thitsaWorksCreditBureauIntegrationWritePlatformService,
-            final ThitsaWorksCreditBureauIntegrationWritePlatformServiceImpl thitsaWorksCreditBureauIntegrationWritePlatformServiceImpl) {
+    public CreditReportWritePlatformServiceImpl(final PlatformSecurityContext context, final CreditBureauRepository creditBureauRepository,
+            final CreditReportRepository creditReportRepository,
+            final ThitsaWorksCreditBureauIntegrationWritePlatformService thitsaWorksCreditBureauIntegrationWritePlatformService) {
         this.context = context;
-        this.configDataRepository = configDataRepository;
         this.creditBureauRepository = creditBureauRepository;
         this.creditReportRepository = creditReportRepository;
         this.thitsaWorksCreditBureauIntegrationWritePlatformService = thitsaWorksCreditBureauIntegrationWritePlatformService;
-        this.thitsaWorksCreditBureauIntegrationWritePlatformServiceImpl = thitsaWorksCreditBureauIntegrationWritePlatformServiceImpl;
     }
 
     @Override
     @Transactional
     public CommandProcessingResult getCreditReport(JsonCommand command) {
-
+        List<ApiParameterError> dataValidationErrors = new ArrayList<>();
+        DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource(CREDIT_BUREAU_INTEGRATION);
         try {
             Long creditBureauID = command.longValueOfParameterNamed("creditBureauID");
 
-            Optional<String> creditBureauName = getCreditBureau(creditBureauID);
+            String creditBureauName = getCreditBureauName(creditBureauID);
 
-            if (creditBureauName.isEmpty()) {
-                baseDataValidator.reset().failWithCode("creditBureau.has.not.been.Integrated");
-                throw new PlatformApiDataValidationException("creditBureau.has.not.been.Integrated", "creditBureau.has.not.been.Integrated",
-                        dataValidationErrors);
-            }
-
-            if (Objects.equals(creditBureauName.get(), CreditBureauConfigurations.THITSAWORKS.toString())) {
+            if (Objects.equals(creditBureauName, CreditBureauConfigurations.THITSAWORKS.toString())) {
 
                 CreditBureauReportData reportobj = this.thitsaWorksCreditBureauIntegrationWritePlatformService
                         .getCreditReportFromThitsaWorks(command);
@@ -109,16 +91,16 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
                 return new CommandProcessingResultBuilder().withCreditReport(reportMap).build();
             }
 
-            baseDataValidator.reset().failWithCode("creditBureau.has.not.been.Integrated");
-            throw new PlatformApiDataValidationException("creditBureau.has.not.been.Integrated", "creditBureau.has.not.been.Integrated",
+            baseDataValidator.reset().failWithCode(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED);
+            throw new PlatformApiDataValidationException(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED, CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED,
                     dataValidationErrors);
 
         } catch (final JpaSystemException | DataIntegrityViolationException dve) {
-            handleTokenDataIntegrityIssues(command, dve.getMostSpecificCause(), dve);
+            handleTokenDataIntegrityIssues(dve.getMostSpecificCause());
             return CommandProcessingResult.empty();
         } catch (final PersistenceException ee) {
             Throwable throwable = ExceptionUtils.getRootCause(ee.getCause());
-            handleTokenDataIntegrityIssues(command, throwable, ee);
+            handleTokenDataIntegrityIssues(throwable);
             return CommandProcessingResult.empty();
         }
 
@@ -127,17 +109,18 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
     @Override
     @Transactional
     public String addCreditReport(Long bureauId, File creditReport, FormDataContentDisposition fileDetail) {
-
-        Optional<String> creditBureauName = getCreditBureau(bureauId);
+        List<ApiParameterError> dataValidationErrors = new ArrayList<>();
+        DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource(CREDIT_BUREAU_INTEGRATION);
+        String creditBureauName = getCreditBureauName(bureauId);
         String responseMessage = null;
 
-        if (Objects.equals(creditBureauName.get(), CreditBureauConfigurations.THITSAWORKS.toString())) {
+        if (Objects.equals(creditBureauName, CreditBureauConfigurations.THITSAWORKS.toString())) {
             responseMessage = this.thitsaWorksCreditBureauIntegrationWritePlatformService.addCreditReport(bureauId, creditReport,
                     fileDetail);
         } else {
 
-            baseDataValidator.reset().failWithCode("creditBureau.has.not.been.Integrated");
-            throw new PlatformApiDataValidationException("creditBureau.has.not.been.Integrated", "creditBureau.has.not.been.Integrated",
+            baseDataValidator.reset().failWithCode(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED);
+            throw new PlatformApiDataValidationException(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED, CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED,
                     dataValidationErrors);
 
         }
@@ -146,20 +129,20 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
 
     }
 
-    private Optional<String> getCreditBureau(Long creditBureauID) {
-
+    private String getCreditBureauName(Long creditBureauID) {
+        List<ApiParameterError> dataValidationErrors = new ArrayList<>();
+        DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource(CREDIT_BUREAU_INTEGRATION);
         if (creditBureauID != null) {
             Optional<CreditBureau> creditBureau = this.creditBureauRepository.findById(creditBureauID);
 
-            if (creditBureau.isEmpty()) {
-                return Optional.empty();
+            if (!creditBureau.isEmpty()) {
+                return creditBureau.get().getName();
             }
-
-            return Optional.of(creditBureau.get().getName());
-
         }
 
-        return Optional.empty();
+        baseDataValidator.reset().failWithCode(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED);
+        throw new PlatformApiDataValidationException(CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED, CREDIT_BUREAU_HAS_NOT_BEEN_INTEGRATED,
+                dataValidationErrors);
     }
 
     // saving the fetched creditreport in database
@@ -170,10 +153,10 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
         try {
             this.context.authenticatedUser();
 
-            Optional<String> creditBureauName = getCreditBureau(creditBureauId);
+            String creditBureauName = getCreditBureauName(creditBureauId);
             CreditReport creditReport = null;
 
-            if (Objects.equals(creditBureauName.get(), CreditBureauConfigurations.THITSAWORKS.toString())) {
+            if (Objects.equals(creditBureauName, CreditBureauConfigurations.THITSAWORKS.toString())) {
 
                 // checks whether creditReport for same nationalId was saved before. if yes, then deletes it & replaces
                 // with new one.
@@ -193,11 +176,11 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
 
             return new CommandProcessingResultBuilder().withEntityId(creditReport.getId()).build();
         } catch (final JpaSystemException | DataIntegrityViolationException dve) {
-            handleTokenDataIntegrityIssues(command, dve.getMostSpecificCause(), dve);
+            handleTokenDataIntegrityIssues(dve.getMostSpecificCause());
             return CommandProcessingResult.empty();
         } catch (final PersistenceException ee) {
             Throwable throwable = ExceptionUtils.getRootCause(ee.getCause());
-            handleTokenDataIntegrityIssues(command, throwable, ee);
+            handleTokenDataIntegrityIssues(throwable);
             return CommandProcessingResult.empty();
         }
     }
@@ -208,10 +191,10 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
 
         this.context.authenticatedUser();
 
-        Optional<String> creditBureauName = getCreditBureau(creditBureauId);
+        String creditBureauName = getCreditBureauName(creditBureauId);
         CreditReport creditReport = null;
 
-        if (Objects.equals(creditBureauName.get(), CreditBureauConfigurations.THITSAWORKS.toString())) {
+        if (Objects.equals(creditBureauName, CreditBureauConfigurations.THITSAWORKS.toString())) {
 
             String nationalId = command.stringValueOfParameterNamed("nationalId");
 
@@ -226,7 +209,7 @@ public class CreditReportWritePlatformServiceImpl implements CreditReportWritePl
         return new CommandProcessingResultBuilder().withEntityId(creditReport.getId()).build();
     }
 
-    private void handleTokenDataIntegrityIssues(final JsonCommand command, final Throwable realCause, final Exception dve) {
+    private void handleTokenDataIntegrityIssues(final Throwable realCause) {
 
         throw new PlatformDataIntegrityException("error.msg.cund.unknown.data.integrity.issue",
                 "Unknown data integrity issue with resource: " + realCause.getMessage());

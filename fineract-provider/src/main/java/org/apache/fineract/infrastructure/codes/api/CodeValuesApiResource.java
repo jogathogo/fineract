@@ -27,21 +27,22 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
@@ -54,16 +55,14 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/codes/{codeId}/codevalues")
+@Path("/v1/codes/{codeId}/codevalues")
 @Component
-@Scope("singleton")
 @Tag(name = "Code Values", description = "Code and code values: Codes represent a specific category of data, their code values are a specific instance of that category.\n"
         + "\n"
         + "Codes are mostly system defined which means the code itself comes out of the box and cannot be modified however its code values can be. e.g. 'Customer Identifier', it defaults to a code value of 'Passport' but could be 'Drivers License, National Id' etc")
+@RequiredArgsConstructor
 public class CodeValuesApiResource {
 
     /**
@@ -73,24 +72,13 @@ public class CodeValuesApiResource {
             Arrays.asList(CodevalueJSONinputParams.CODEVALUE_ID.getValue(), CodevalueJSONinputParams.NAME.getValue(),
                     CodevalueJSONinputParams.POSITION.getValue(), CodevalueJSONinputParams.IS_MANDATORY.getValue(),
                     CodevalueJSONinputParams.DESCRIPTION.getValue()));
-    private final String resourceNameForPermissions = "CODEVALUE";
+    private static final String RESOURCE_NAME_FOR_PERMISSIONS = "CODEVALUE";
 
     private final PlatformSecurityContext context;
     private final CodeValueReadPlatformService readPlatformService;
     private final DefaultToApiJsonSerializer<CodeValueData> toApiJsonSerializer;
     private final ApiRequestParameterHelper apiRequestParameterHelper;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
-
-    @Autowired
-    public CodeValuesApiResource(final PlatformSecurityContext context, final CodeValueReadPlatformService readPlatformService,
-            final DefaultToApiJsonSerializer<CodeValueData> toApiJsonSerializer, final ApiRequestParameterHelper apiRequestParameterHelper,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService) {
-        this.context = context;
-        this.readPlatformService = readPlatformService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-    }
 
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -102,7 +90,7 @@ public class CodeValuesApiResource {
     public String retrieveAllCodeValues(@Context final UriInfo uriInfo,
             @PathParam("codeId") @Parameter(description = "codeId") final Long codeId) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final Collection<CodeValueData> codeValues = this.readPlatformService.retrieveAllCodeValues(codeId);
 
@@ -122,7 +110,7 @@ public class CodeValuesApiResource {
             @PathParam("codeValueId") @Parameter(description = "codeValueId") final Long codeValueId,
             @PathParam("codeId") @Parameter(description = "codeId") final Long codeId) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final CodeValueData codeValue = this.readPlatformService.retrieveCodeValue(codeValueId);
 

@@ -25,21 +25,22 @@ import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
+import java.util.UUID;
 import org.apache.fineract.infrastructure.bulkimport.constants.LoanConstants;
 import org.apache.fineract.infrastructure.bulkimport.constants.TemplatePopulateImportConstants;
 import org.apache.fineract.integrationtests.common.CollateralManagementHelper;
@@ -70,7 +71,6 @@ public class LoanImportHandlerTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanImportHandlerTest.class);
     private static final String CREATE_CLIENT_URL = "/fineract-provider/api/v1/clients?" + Utils.TENANT_IDENTIFIER;
-    private static final String CREATE_CHARGE_URL = "/fineract-provider/api/v1/charges?" + Utils.TENANT_IDENTIFIER;
     public static final String DATE_FORMAT = "dd MMMM yyyy";
 
     private ResponseSpecification responseSpec;
@@ -96,9 +96,9 @@ public class LoanImportHandlerTest {
         OfficeDomain office = officeHelper.retrieveOfficeByID(outcome_office_creation);
         Assertions.assertNotNull(office, "Could not retrieve created office");
 
-        String firstName = Utils.randomNameGenerator("Client_FirstName_", 5);
-        String lastName = Utils.randomNameGenerator("Client_LastName_", 4);
-        String externalId = Utils.randomStringGenerator("ID_", 7, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        String firstName = Utils.randomStringGenerator("Client_FirstName_", 5);
+        String lastName = Utils.randomStringGenerator("Client_LastName_", 4);
+        String externalId = UUID.randomUUID().toString();
 
         final HashMap<String, Object> clientMap = new HashMap<>();
         clientMap.put("officeId", outcome_office_creation.toString());
@@ -155,8 +155,8 @@ public class LoanImportHandlerTest {
         Assertions.assertNotNull("Could not get created Loan Product", loanProductStr);
         JsonPath loanProductJson = JsonPath.from(loanProductStr);
 
-        String fundName = Utils.randomNameGenerator("", 9);
-        FundsHelper fh = FundsHelper.create(fundName).externalId("fund-" + fundName).build();
+        String fundName = Utils.uniqueRandomStringGenerator("", 9);
+        FundsHelper fh = FundsHelper.create(fundName).externalId(UUID.randomUUID().toString()).build();
         Integer outcome_fund_creation = FundsResourceHandler.createFund(new Gson().toJson(fh), requestSpec, responseSpec);
         Assertions.assertNotNull(outcome_fund_creation, "Could not create Fund");
 
@@ -167,7 +167,7 @@ public class LoanImportHandlerTest {
         Assertions.assertNotNull(outcome_payment_creation, "Could not create payment type");
 
         LoanTransactionHelper loanTransactionHelper = new LoanTransactionHelper(requestSpec, responseSpec);
-        Workbook workbook = loanTransactionHelper.getLoanWorkbook("dd MMMM yyyy");
+        Workbook workbook = loanTransactionHelper.getLoanWorkbook(DATE_FORMAT);
 
         // insert dummy data into loan Sheet
         Sheet loanSheet = workbook.getSheet(TemplatePopulateImportConstants.LOANS_SHEET_NAME);
@@ -179,11 +179,13 @@ public class LoanImportHandlerTest {
         firstLoanRow.createCell(LoanConstants.CLIENT_EXTERNAL_ID).setCellValue(externalId);
         firstLoanRow.createCell(LoanConstants.PRODUCT_COL).setCellValue(loanProductJson.getString("name"));
         firstLoanRow.createCell(LoanConstants.LOAN_OFFICER_NAME_COL).setCellValue((String) staffMap.get("displayName"));
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
-        Date date = simpleDateFormat.parse("13 May 2017");
-        firstLoanRow.createCell(LoanConstants.SUBMITTED_ON_DATE_COL).setCellValue(date);
-        firstLoanRow.createCell(LoanConstants.APPROVED_DATE_COL).setCellValue(date);
-        firstLoanRow.createCell(LoanConstants.DISBURSED_DATE_COL).setCellValue(date);
+
+        final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern(DATE_FORMAT, Locale.US);
+        final LocalDate localDate = LocalDate.parse("17 May 2017", dateFormat);
+
+        firstLoanRow.createCell(LoanConstants.SUBMITTED_ON_DATE_COL).setCellValue(localDate);
+        firstLoanRow.createCell(LoanConstants.APPROVED_DATE_COL).setCellValue(localDate);
+        firstLoanRow.createCell(LoanConstants.DISBURSED_DATE_COL).setCellValue(localDate);
         firstLoanRow.createCell(LoanConstants.DISBURSED_PAYMENT_TYPE_COL).setCellValue(paymentTypeName);
         firstLoanRow.createCell(LoanConstants.FUND_NAME_COL).setCellValue(fundName);
         firstLoanRow.createCell(LoanConstants.PRINCIPAL_COL).setCellValue(loanProductJson.getFloat("principal"));
@@ -208,9 +210,9 @@ public class LoanImportHandlerTest {
         firstLoanRow.createCell(LoanConstants.GRACE_ON_PRINCIPAL_PAYMENT_COL).setCellValue(0);
         firstLoanRow.createCell(LoanConstants.GRACE_ON_INTEREST_PAYMENT_COL).setCellValue(0);
         firstLoanRow.createCell(LoanConstants.GRACE_ON_INTEREST_CHARGED_COL).setCellValue(0);
-        firstLoanRow.createCell(LoanConstants.FIRST_REPAYMENT_COL).setCellValue(date);
+        firstLoanRow.createCell(LoanConstants.FIRST_REPAYMENT_COL).setCellValue(localDate);
         firstLoanRow.createCell(LoanConstants.TOTAL_AMOUNT_REPAID_COL).setCellValue(6000);
-        firstLoanRow.createCell(LoanConstants.LAST_REPAYMENT_DATE_COL).setCellValue(date);
+        firstLoanRow.createCell(LoanConstants.LAST_REPAYMENT_DATE_COL).setCellValue(localDate);
         firstLoanRow.createCell(LoanConstants.REPAYMENT_TYPE_COL).setCellValue(paymentTypeName);
         firstLoanRow.createCell(LoanConstants.LOAN_COLLATERAL_ID).setCellValue(collaterals.get(0).get("clientCollateralId").toString());
         firstLoanRow.createCell(LoanConstants.LOAN_COLLATERAL_QUANTITY).setCellValue(collaterals.get(0).get("quantity").toString());

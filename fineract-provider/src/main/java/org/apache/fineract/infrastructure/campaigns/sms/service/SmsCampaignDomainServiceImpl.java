@@ -21,51 +21,57 @@ package org.apache.fineract.infrastructure.campaigns.sms.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.security.InvalidParameterException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.infrastructure.campaigns.sms.constants.SmsCampaignTriggerType;
 import org.apache.fineract.infrastructure.campaigns.sms.domain.SmsCampaign;
 import org.apache.fineract.infrastructure.campaigns.sms.domain.SmsCampaignRepository;
 import org.apache.fineract.infrastructure.campaigns.sms.exception.SmsRuntimeException;
 import org.apache.fineract.infrastructure.campaigns.sms.serialization.SmsCampaignValidator;
+import org.apache.fineract.infrastructure.event.business.BusinessEventListener;
+import org.apache.fineract.infrastructure.event.business.domain.client.ClientActivateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.client.ClientRejectBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanApprovedBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.LoanRejectedBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanTransactionMakeRepaymentPostBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.savings.SavingsActivateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.savings.SavingsRejectBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.savings.transaction.SavingsDepositBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.savings.transaction.SavingsWithdrawalBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.sms.domain.SmsMessage;
 import org.apache.fineract.infrastructure.sms.domain.SmsMessageRepository;
 import org.apache.fineract.infrastructure.sms.scheduler.SmsMessageScheduledJobService;
 import org.apache.fineract.organisation.office.domain.Office;
 import org.apache.fineract.organisation.office.domain.OfficeRepository;
+import org.apache.fineract.organisation.office.exception.OfficeNotFoundException;
 import org.apache.fineract.portfolio.client.domain.Client;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEntity;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEvents;
-import org.apache.fineract.portfolio.common.service.BusinessEventListener;
-import org.apache.fineract.portfolio.common.service.BusinessEventNotifierService;
 import org.apache.fineract.portfolio.group.domain.Group;
 import org.apache.fineract.portfolio.group.domain.GroupRepository;
+import org.apache.fineract.portfolio.group.exception.GroupNotFoundException;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.exception.InvalidLoanTypeException;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountTransaction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
-
-    private static final Logger LOG = LoggerFactory.getLogger(SmsCampaignDomainServiceImpl.class);
-
-    // private static final int POOL_SIZE = 5 ;
 
     private final SmsCampaignRepository smsCampaignRepository;
     private final SmsMessageRepository smsMessageRepository;
@@ -77,36 +83,21 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
     private final SmsMessageScheduledJobService smsMessageScheduledJobService;
     private final SmsCampaignValidator smsCampaignValidator;
 
-    @Autowired
-    public SmsCampaignDomainServiceImpl(final SmsCampaignRepository smsCampaignRepository, final SmsMessageRepository smsMessageRepository,
-            final BusinessEventNotifierService businessEventNotifierService, final OfficeRepository officeRepository,
-            final SmsCampaignWritePlatformService smsCampaignWritePlatformCommandHandler, final GroupRepository groupRepository,
-            final SmsMessageScheduledJobService smsMessageScheduledJobService, final SmsCampaignValidator smsCampaignValidator) {
-        this.smsCampaignRepository = smsCampaignRepository;
-        this.smsMessageRepository = smsMessageRepository;
-        this.businessEventNotifierService = businessEventNotifierService;
-        this.officeRepository = officeRepository;
-        this.smsCampaignWritePlatformCommandHandler = smsCampaignWritePlatformCommandHandler;
-        this.groupRepository = groupRepository;
-        this.smsMessageScheduledJobService = smsMessageScheduledJobService;
-        this.smsCampaignValidator = smsCampaignValidator;
-    }
-
     @PostConstruct
     public void addListeners() {
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_APPROVED, new SendSmsOnLoanApproved());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_REJECTED, new SendSmsOnLoanRejected());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.LOAN_MAKE_REPAYMENT, new SendSmsOnLoanRepayment());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.CLIENTS_ACTIVATE, new ClientActivatedListener());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.CLIENTS_REJECT, new ClientRejectedListener());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.SAVINGS_ACTIVATE,
+        businessEventNotifierService.addPostBusinessEventListener(LoanApprovedBusinessEvent.class, new SendSmsOnLoanApproved());
+        businessEventNotifierService.addPostBusinessEventListener(LoanRejectedBusinessEvent.class, new SendSmsOnLoanRejected());
+        businessEventNotifierService.addPostBusinessEventListener(LoanTransactionMakeRepaymentPostBusinessEvent.class,
+                new SendSmsOnLoanRepayment());
+        businessEventNotifierService.addPostBusinessEventListener(ClientActivateBusinessEvent.class, new ClientActivatedListener());
+        businessEventNotifierService.addPostBusinessEventListener(ClientRejectBusinessEvent.class, new ClientRejectedListener());
+        businessEventNotifierService.addPostBusinessEventListener(SavingsActivateBusinessEvent.class,
                 new SavingsAccountActivatedListener());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.SAVINGS_REJECT,
-                new SavingsAccountRejectedListener());
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.SAVINGS_DEPOSIT,
-                new SavingsAccountTransactionListener(true));
-        this.businessEventNotifierService.addBusinessEventPostListeners(BusinessEvents.SAVINGS_WITHDRAWAL,
-                new SavingsAccountTransactionListener(false));
+        businessEventNotifierService.addPostBusinessEventListener(SavingsRejectBusinessEvent.class, new SavingsAccountRejectedListener());
+        businessEventNotifierService.addPostBusinessEventListener(SavingsDepositBusinessEvent.class,
+                new DepositSavingsAccountTransactionListener());
+        businessEventNotifierService.addPostBusinessEventListener(SavingsWithdrawalBusinessEvent.class,
+                new NonDepositSavingsAccountTransactionListener());
     }
 
     private void notifyRejectedLoanOwner(Loan loan) {
@@ -181,13 +172,16 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                         throw new InvalidLoanTypeException("Loan Type cannot be Invalid for the Triggered Sms Campaign");
                     }
                     if (loan.isGroupLoan()) {
-                        Group group = this.groupRepository.findById(loan.getGroupId()).orElse(null);
+                        Group group = this.groupRepository.findById(loan.getGroupId())
+                                .orElseThrow(() -> new GroupNotFoundException(loan.getGroupId()));
                         groupClients.addAll(group.getClientMembers());
                     } else {
                         groupClients.add(loan.client());
                     }
                     HashMap<String, String> campaignParams = new ObjectMapper().readValue(smsCampaign.getParamValue(),
-                            new TypeReference<HashMap<String, String>>() {});
+                            new TypeReference<>() {
+
+                            });
 
                     if (groupClients.size() > 0) {
                         for (Client client : groupClients) {
@@ -201,7 +195,9 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                                 }
                                 if (spkeycheck && !(value.equals("-1") || spvalue.equals(value))) {
                                     if (key.equals("officeId")) {
-                                        Office campaignOffice = this.officeRepository.findById(Long.valueOf(value)).orElse(null);
+                                        Long officeId = Long.valueOf(value);
+                                        Office campaignOffice = this.officeRepository.findById(Long.valueOf(value))
+                                                .orElseThrow(() -> new OfficeNotFoundException(officeId));
                                         if (campaignOffice.doesNotHaveAnOfficeInHierarchyWithId(client.getOffice().getId())) {
                                             throw new SmsRuntimeException("error.msg.no.office", "Office not found for the id");
                                         }
@@ -220,18 +216,16 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                                 }
                                 SmsMessage smsMessage = SmsMessage.pendingSms(null, null, client, null, message, mobileNumber, smsCampaign,
                                         smsCampaign.isNotification());
-                                Collection<SmsMessage> messages = new ArrayList<>();
-                                messages.add(smsMessage);
                                 Map<SmsCampaign, Collection<SmsMessage>> smsDataMap = new HashMap<>();
-                                smsDataMap.put(smsCampaign, messages);
+                                smsDataMap.put(smsCampaign, Collections.singletonList(smsMessage));
                                 this.smsMessageScheduledJobService.sendTriggeredMessages(smsDataMap);
                             }
                         }
                     }
                 } catch (final IOException e) {
-                    LOG.error("smsParams does not contain the key: ", e);
+                    log.error("smsParams does not contain the key: ", e);
                 } catch (final RuntimeException e) {
-                    LOG.debug("Client Office Id and SMS Campaign Office id doesn't match ", e);
+                    log.debug("Client Office Id and SMS Campaign Office id doesn't match ", e);
                 }
             }
         }
@@ -246,7 +240,9 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                     final SavingsAccount savingsAccount = savingsTransaction.getSavingsAccount();
                     final Client client = savingsAccount.getClient();
                     HashMap<String, String> campaignParams = new ObjectMapper().readValue(smsCampaign.getParamValue(),
-                            new TypeReference<HashMap<String, String>>() {});
+                            new TypeReference<>() {
+
+                            });
                     HashMap<String, Object> smsParams = processSavingsTransactionDataForSms(savingsTransaction, client);
                     for (String key : campaignParams.keySet()) {
                         String value = campaignParams.get(key);
@@ -257,7 +253,9 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                         }
                         if (spkeycheck && !(value.equals("-1") || spvalue.equals(value))) {
                             if (key.equals("officeId")) {
-                                Office campaignOffice = this.officeRepository.findById(Long.valueOf(value)).orElse(null);
+                                Long officeId = Long.valueOf(value);
+                                Office campaignOffice = this.officeRepository.findById(officeId)
+                                        .orElseThrow(() -> new OfficeNotFoundException(officeId));
                                 if (campaignOffice.doesNotHaveAnOfficeInHierarchyWithId(client.getOffice().getId())) {
                                     throw new SmsRuntimeException("error.msg.no.office", "Office not found for the id");
                                 }
@@ -284,9 +282,9 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
                         this.smsMessageScheduledJobService.sendTriggeredMessages(smsDataMap);
                     }
                 } catch (final IOException e) {
-                    LOG.error("smsParams does not contain the key: ", e);
+                    log.error("smsParams does not contain the key: ", e);
                 } catch (final RuntimeException e) {
-                    LOG.debug("Client Office Id and SMS Campaign Office id doesn't match ", e);
+                    log.debug("Client Office Id and SMS Campaign Office id doesn't match ", e);
                 }
             }
         }
@@ -320,7 +318,7 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
         smsParams.put("lastname", client.getLastname());
         smsParams.put("FullName", client.getDisplayName());
         smsParams.put("mobileNo", client.mobileNo());
-        smsParams.put("LoanAmount", loan.getPrincpal());
+        smsParams.put("LoanAmount", loan.getPrincipal());
         smsParams.put("LoanOutstanding", loanTransaction.getOutstandingLoanBalance());
         smsParams.put("loanId", loan.getId());
         smsParams.put("LoanAccountId", loan.getAccountNumber());
@@ -352,7 +350,7 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
         // {{balance}}
 
         // transactionDate
-        HashMap<String, Object> smsParams = new HashMap<String, Object>();
+        HashMap<String, Object> smsParams = new HashMap<>();
         SavingsAccount savingsAccount = savingsAccountTransaction.getSavingsAccount();
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM:d:yyyy");
         smsParams.put("clientId", client.getId());
@@ -384,123 +382,77 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
         return smsParams;
     }
 
-    private abstract static class SmsBusinessEventAdapter implements BusinessEventListener {
+    private class SendSmsOnLoanApproved implements BusinessEventListener<LoanApprovedBusinessEvent> {
 
         @Override
-        public void businessEventToBeExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            // Nothing to do
+        public void onBusinessEvent(LoanApprovedBusinessEvent event) {
+            Loan loan = event.get();
+            notifyAcceptedLoanOwner(loan);
         }
     }
 
-    private class SendSmsOnLoanApproved extends SmsBusinessEventAdapter {
+    private class SendSmsOnLoanRejected implements BusinessEventListener<LoanRejectedBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEventNotificationConstants.BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                notifyAcceptedLoanOwner(loan);
-            }
+        public void onBusinessEvent(LoanRejectedBusinessEvent event) {
+            Loan loan = event.get();
+            notifyRejectedLoanOwner(loan);
         }
     }
 
-    private class SendSmsOnLoanRejected extends SmsBusinessEventAdapter {
+    private class SendSmsOnLoanRepayment implements BusinessEventListener<LoanTransactionMakeRepaymentPostBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEventNotificationConstants.BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.LOAN);
-            if (entity instanceof Loan) {
-                Loan loan = (Loan) entity;
-                notifyRejectedLoanOwner(loan);
-            }
+        public void onBusinessEvent(LoanTransactionMakeRepaymentPostBusinessEvent event) {
+            sendSmsForLoanRepayment(event.get());
         }
     }
 
-    private class SendSmsOnLoanRepayment extends SmsBusinessEventAdapter {
+    private class ClientActivatedListener implements BusinessEventListener<ClientActivateBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEventNotificationConstants.BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.LOAN_TRANSACTION);
-            if (entity instanceof LoanTransaction) {
-                LoanTransaction loanTransaction = (LoanTransaction) entity;
-                sendSmsForLoanRepayment(loanTransaction);
-            }
+        public void onBusinessEvent(ClientActivateBusinessEvent event) {
+            notifyClientActivated(event.get());
         }
     }
 
-    private class ClientActivatedListener extends SmsBusinessEventAdapter {
+    private class ClientRejectedListener implements BusinessEventListener<ClientRejectBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.CLIENT);
-            if (entity instanceof Client) {
-                notifyClientActivated((Client) entity);
-            }
+        public void onBusinessEvent(ClientRejectBusinessEvent event) {
+            notifyClientRejected(event.get());
         }
     }
 
-    private class ClientRejectedListener extends SmsBusinessEventAdapter {
+    private class SavingsAccountActivatedListener implements BusinessEventListener<SavingsActivateBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.CLIENT);
-            if (entity instanceof Client) {
-                notifyClientRejected((Client) entity);
-            }
-
+        public void onBusinessEvent(SavingsActivateBusinessEvent event) {
+            notifySavingsAccountActivated(event.get());
         }
     }
 
-    private class SavingsAccountActivatedListener extends SmsBusinessEventAdapter {
+    private class SavingsAccountRejectedListener implements BusinessEventListener<SavingsRejectBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.SAVING);
-            if (entity instanceof SavingsAccount) {
-                notifySavingsAccountActivated((SavingsAccount) entity);
-            }
-
+        public void onBusinessEvent(SavingsRejectBusinessEvent event) {
+            notifySavingsAccountRejected(event.get());
         }
     }
 
-    private class SavingsAccountRejectedListener extends SmsBusinessEventAdapter {
+    private class DepositSavingsAccountTransactionListener implements BusinessEventListener<SavingsDepositBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.SAVING);
-            if (entity instanceof SavingsAccount) {
-                notifySavingsAccountRejected((SavingsAccount) entity);
-            }
+        public void onBusinessEvent(SavingsDepositBusinessEvent event) {
+            sendSmsForSavingsTransaction(event.get(), true);
         }
     }
 
-    private class SavingsAccountTransactionListener extends SmsBusinessEventAdapter {
-
-        final boolean isDeposit;
-
-        SavingsAccountTransactionListener(final boolean isDeposit) {
-            this.isDeposit = isDeposit;
-        }
+    private class NonDepositSavingsAccountTransactionListener implements BusinessEventListener<SavingsWithdrawalBusinessEvent> {
 
         @Override
-        public void businessEventWasExecuted(Map<BusinessEntity, Object> businessEventEntity) {
-            Object entity = businessEventEntity.get(BusinessEventNotificationConstants.BusinessEntity.SAVINGS_TRANSACTION);
-            if (entity instanceof SavingsAccountTransaction) {
-                sendSmsForSavingsTransaction((SavingsAccountTransaction) entity, this.isDeposit);
-            }
+        public void onBusinessEvent(SavingsWithdrawalBusinessEvent event) {
+            sendSmsForSavingsTransaction(event.get(), false);
         }
     }
-
-    /*
-     * private abstract class Task implements Runnable {
-     *
-     * protected final FineractPlatformTenant tenant;
-     *
-     * protected final String reportName ;
-     *
-     * private final Object entity ;
-     *
-     * public Task(final FineractPlatformTenant tenant, final String reportName, final Object entity) { this.tenant =
-     * tenant; this.reportName = reportName ; this.entity = entity ; } }
-     */
 }

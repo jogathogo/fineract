@@ -27,24 +27,28 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.List;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
 import org.apache.fineract.infrastructure.core.api.ApiRequestParameterHelper;
+import org.apache.fineract.infrastructure.core.config.FineractProperties;
+import org.apache.fineract.infrastructure.core.data.ApiGlobalErrorResponse;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.exception.UnrecognizedQueryParamException;
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
@@ -57,14 +61,14 @@ import org.apache.fineract.infrastructure.jobs.service.JobRegisterService;
 import org.apache.fineract.infrastructure.jobs.service.SchedulerJobRunnerReadService;
 import org.apache.fineract.infrastructure.security.exception.NoAuthorizationException;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-@Path("/jobs")
+@Path("/v1/jobs")
 @Consumes({ MediaType.APPLICATION_JSON })
 @Produces({ MediaType.APPLICATION_JSON })
 @Component
-@Tag(name = "MIFOSX-BATCH JOBS", description = "Batch jobs (also known as cron jobs on Unix-based systems) are a series of back-end jobs executed on a computer at a particular time defined in job's cron expression.\n\n At any point, you can view the list of batch jobs scheduled to run along with other details specific to each job. Manually you can execute the jobs at any point of time.\n\n The scheduler status can be either \"Active\" or \"Standby\". If the scheduler status is Active, it indicates that all batch jobs are running/ will run as per the specified schedule.If the scheduler status is Standby, it will ensure all scheduled batch runs are suspended.")
+@RequiredArgsConstructor
+@Tag(name = "SCHEDULER JOB", description = "Batch jobs (also known as cron jobs on Unix-based systems) are a series of back-end jobs executed on a computer at a particular time defined in job's cron expression.\n\n At any point, you can view the list of batch jobs scheduled to run along with other details specific to each job. Manually you can execute the jobs at any point of time.\n\n The scheduler status can be either \"Active\" or \"Standby\". If the scheduler status is Active, it indicates that all batch jobs are running/ will run as per the specified schedule.If the scheduler status is Standby, it will ensure all scheduled batch runs are suspended.")
 public class SchedulerJobApiResource {
 
     private final SchedulerJobRunnerReadService schedulerJobRunnerReadService;
@@ -74,21 +78,7 @@ public class SchedulerJobApiResource {
     private final ToApiJsonSerializer<JobDetailHistoryData> jobHistoryToApiJsonSerializer;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
     private final PlatformSecurityContext context;
-
-    @Autowired
-    public SchedulerJobApiResource(final SchedulerJobRunnerReadService schedulerJobRunnerReadService,
-            final JobRegisterService jobRegisterService, final ToApiJsonSerializer<JobDetailData> toApiJsonSerializer,
-            final ApiRequestParameterHelper apiRequestParameterHelper,
-            final ToApiJsonSerializer<JobDetailHistoryData> jobHistoryToApiJsonSerializer,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService, final PlatformSecurityContext context) {
-        this.schedulerJobRunnerReadService = schedulerJobRunnerReadService;
-        this.jobRegisterService = jobRegisterService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.jobHistoryToApiJsonSerializer = jobHistoryToApiJsonSerializer;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-        this.context = context;
-    }
+    private final FineractProperties fineractProperties;
 
     @GET
     @Operation(summary = "Retrieve Scheduler Jobs", description = "Returns the list of jobs.\n" + "\n" + "Example Requests:\n" + "\n"
@@ -138,21 +128,30 @@ public class SchedulerJobApiResource {
     @POST
     @Path("{" + SchedulerJobApiConstants.JOB_ID + "}")
     @Operation(summary = "Run a Job", description = "Manually Execute Specific Job.")
+    @RequestBody(content = @Content(schema = @Schema(implementation = SchedulerJobApiResourceSwagger.ExecuteJobRequest.class)))
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "POST: jobs/1?command=executeJob") })
     public Response executeJob(@PathParam(SchedulerJobApiConstants.JOB_ID) @Parameter(description = "jobId") final Long jobId,
-            @QueryParam(SchedulerJobApiConstants.COMMAND) @Parameter(description = "command") final String commandParam) {
+            @QueryParam(SchedulerJobApiConstants.COMMAND) @Parameter(description = "command") final String commandParam,
+            @Parameter(hidden = true) final String jsonRequestBody) {
         // check the logged in user have permissions to execute scheduler jobs
-        final boolean hasNotPermission = this.context.authenticatedUser().hasNotPermissionForAnyOf("ALL_FUNCTIONS", "EXECUTEJOB_SCHEDULER");
-        if (hasNotPermission) {
-            final String authorizationMessage = "User has no authority to execute scheduler jobs";
-            throw new NoAuthorizationException(authorizationMessage);
-        }
-        Response response = Response.status(400).build();
-        if (is(commandParam, SchedulerJobApiConstants.COMMAND_EXECUTE_JOB)) {
-            this.jobRegisterService.executeJob(jobId);
-            response = Response.status(202).build();
+        Response response;
+        if (fineractProperties.getMode().isBatchManagerEnabled()) {
+            final boolean hasNotPermission = this.context.authenticatedUser().hasNotPermissionForAnyOf("ALL_FUNCTIONS",
+                    "EXECUTEJOB_SCHEDULER");
+            if (hasNotPermission) {
+                final String authorizationMessage = "User has no authority to execute scheduler jobs";
+                throw new NoAuthorizationException(authorizationMessage);
+            }
+            response = Response.status(400).build();
+            if (is(commandParam, SchedulerJobApiConstants.COMMAND_EXECUTE_JOB)) {
+                jobRegisterService.executeJobWithParameters(jobId, jsonRequestBody);
+                response = Response.status(202).build();
+            } else {
+                throw new UnrecognizedQueryParamException(SchedulerJobApiConstants.COMMAND, commandParam);
+            }
         } else {
-            throw new UnrecognizedQueryParamException(SchedulerJobApiConstants.COMMAND, commandParam);
+            ApiGlobalErrorResponse errorResponse = ApiGlobalErrorResponse.invalidInstanceTypeMethod("Batch");
+            response = Response.status(Status.METHOD_NOT_ALLOWED).entity(errorResponse).build();
         }
         return response;
     }

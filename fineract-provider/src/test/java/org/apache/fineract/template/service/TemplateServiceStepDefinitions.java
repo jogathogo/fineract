@@ -40,6 +40,10 @@ public class TemplateServiceStepDefinitions implements En {
 
     @Autowired
     private TemplateMergeService tms;
+<<<<<<< HEAD
+=======
+
+>>>>>>> develop
     private String template;
 
     private Map<String, Object> data;

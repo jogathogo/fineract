@@ -20,29 +20,28 @@ package org.apache.fineract.accounting.journalentry.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.accounting.journalentry.command.JournalEntryCommand;
@@ -68,21 +67,19 @@ import org.apache.fineract.infrastructure.core.service.SearchParameters;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/journalentries")
+@Path("/v1/journalentries")
 @Component
-@Scope("singleton")
 @Tag(name = "Journal Entries", description = "A journal entry refers to the logging of transactions against general ledger accounts. A journal entry may consist of several line items, each of which is either a \"debit\" or a \"credit\". The total amount of the debits must equal the total amount of the credits or the journal entry is said to be \"unbalanced\" \n"
         + "\n" + "A journal entry directly changes the account balances on the general ledger")
 @RequiredArgsConstructor
 public class JournalEntriesApiResource {
 
-    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(
-            Arrays.asList("id", "officeId", "officeName", "glAccountName", "glAccountId", "glAccountCode", "glAccountType",
-                    "transactionDate", "entryType", "amount", "transactionId", "manualEntry", "entityType", "entityId", "createdByUserId",
-                    "createdDate", "createdByUserName", "comments", "reversed", "referenceNumber", "currency", "transactionDetails"));
+    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(Arrays.asList("id", "officeId", "officeName", "glAccountName",
+            "glAccountId", "glAccountCode", "glAccountType", "transactionDate", "entryType", "amount", "transactionId", "manualEntry",
+            "entityType", "entityId", "createdByUserId", "createdDate", "submittedOnDate", "createdByUserName", "comments", "reversed",
+            "referenceNumber", "currency", "transactionDetails"));
 
     private final String resourceNameForPermission = "JOURNALENTRY";
 
@@ -104,13 +101,15 @@ public class JournalEntriesApiResource {
             + "\n" + "journalentries?orderBy=transactionId&sortOrder=DESC\n" + "\n" + "journalentries?runningBalance=true\n" + "\n"
             + "journalentries?transactionDetails=true\n" + "\n" + "journalentries?loanId=12\n" + "\n" + "journalentries?savingsId=24")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = JournalEntryData.class)))) })
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = JournalEntriesApiResourceSwagger.GetJournalEntriesTransactionIdResponse.class))) })
     public String retrieveAll(@Context final UriInfo uriInfo,
             @QueryParam("officeId") @Parameter(description = "officeId") final Long officeId,
             @QueryParam("glAccountId") @Parameter(description = "glAccountId") final Long glAccountId,
             @QueryParam("manualEntriesOnly") @Parameter(description = "manualEntriesOnly") final Boolean onlyManualEntries,
             @QueryParam("fromDate") @Parameter(description = "fromDate") final DateParam fromDateParam,
             @QueryParam("toDate") @Parameter(description = "toDate") final DateParam toDateParam,
+            @QueryParam("submittedOnDateFrom") @Parameter(description = "submittedOnDateFrom") final DateParam submittedOnDateFromParam,
+            @QueryParam("submittedOnDateTo") @Parameter(description = "submittedOnDateTo") final DateParam submittedOnDateToParam,
             @QueryParam("transactionId") @Parameter(description = "transactionId") final String transactionId,
             @QueryParam("entityType") @Parameter(description = "entityType") final Integer entityType,
             @QueryParam("offset") @Parameter(description = "offset") final Integer offset,
@@ -126,13 +125,22 @@ public class JournalEntriesApiResource {
 
         this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermission);
 
-        Date fromDate = null;
+        LocalDate fromDate = null;
         if (fromDateParam != null) {
             fromDate = fromDateParam.getDate("fromDate", dateFormat, locale);
         }
-        Date toDate = null;
+        LocalDate toDate = null;
         if (toDateParam != null) {
             toDate = toDateParam.getDate("toDate", dateFormat, locale);
+        }
+
+        LocalDate submittedOnDateFrom = null;
+        if (submittedOnDateFromParam != null) {
+            submittedOnDateFrom = submittedOnDateFromParam.getDate("submittedOnDateFrom", dateFormat, locale);
+        }
+        LocalDate submittedOnDateTo = null;
+        if (submittedOnDateToParam != null) {
+            submittedOnDateTo = submittedOnDateToParam.getDate("submittedOnDateTo", dateFormat, locale);
         }
 
         final SearchParameters searchParameters = SearchParameters.forJournalEntries(officeId, offset, limit, orderBy, sortOrder, loanId,
@@ -141,7 +149,8 @@ public class JournalEntriesApiResource {
                 runningBalance);
 
         final Page<JournalEntryData> glJournalEntries = this.journalEntryReadPlatformService.retrieveAll(searchParameters, glAccountId,
-                onlyManualEntries, fromDate, toDate, transactionId, entityType, associationParametersData);
+                onlyManualEntries, fromDate, toDate, submittedOnDateFrom, submittedOnDateTo, transactionId, entityType,
+                associationParametersData);
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
         return this.apiJsonSerializerService.serialize(settings, glJournalEntries, RESPONSE_DATA_PARAMETERS);
     }
@@ -154,8 +163,8 @@ public class JournalEntriesApiResource {
             + "journalentries/1?fields=officeName,glAccountId,entryType,amount\n" + "\n" + "journalentries/1?runningBalance=true\n" + "\n"
             + "journalentries/1?transactionDetails=true")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = JournalEntryData.class))) })
-    public String retreiveJournalEntryById(
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = JournalEntriesApiResourceSwagger.JournalEntryTransactionItem.class))) })
+    public String retrieveJournalEntryById(
             @PathParam("journalEntryId") @Parameter(description = "journalEntryId") final Long journalEntryId,
             @Context final UriInfo uriInfo,
             @QueryParam("runningBalance") @Parameter(description = "runningBalance") final boolean runningBalance,
@@ -185,7 +194,7 @@ public class JournalEntriesApiResource {
     public String createGLJournalEntry(@Parameter(hidden = true) final String jsonRequestBody,
             @QueryParam("command") @Parameter(description = "command") final String commandParam) {
 
-        CommandProcessingResult result = null;
+        CommandProcessingResult result;
         if (is(commandParam, "updateRunningBalance")) {
             final CommandWrapper commandRequest = new CommandWrapperBuilder().updateRunningBalanceForJournalEntry()
                     .withJson(jsonRequestBody).build();
@@ -213,7 +222,7 @@ public class JournalEntriesApiResource {
     public String createReversalJournalEntry(@Parameter(hidden = true) final String jsonRequestBody,
             @PathParam("transactionId") @Parameter(description = "transactionId") final String transactionId,
             @QueryParam("command") @Parameter(description = "command") final String commandParam) {
-        CommandProcessingResult result = null;
+        CommandProcessingResult result;
         if (is(commandParam, "reverse")) {
             final CommandWrapper commandRequest = new CommandWrapperBuilder().reverseJournalEntry(transactionId).withJson(jsonRequestBody)
                     .build();
@@ -234,8 +243,8 @@ public class JournalEntriesApiResource {
         this.context.authenticatedUser();
         String transactionId = "P" + entryId;
         SearchParameters params = SearchParameters.forPagination(offset, limit);
-        Page<JournalEntryData> entries = this.journalEntryReadPlatformService.retrieveAll(params, null, null, null, null, transactionId,
-                PortfolioProductType.PROVISIONING.getValue(), null);
+        Page<JournalEntryData> entries = this.journalEntryReadPlatformService.retrieveAll(params, null, null, null, null, null, null,
+                transactionId, PortfolioProductType.PROVISIONING.getValue(), null);
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
         return this.apiJsonSerializerService.serialize(settings, entries, RESPONSE_DATA_PARAMETERS);
     }

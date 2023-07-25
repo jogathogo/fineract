@@ -57,9 +57,9 @@ public class SavingsProductHelper {
     private static final String NONE = "1";
     private static final String CASH_BASED = "2";
 
-    private String nameOfSavingsProduct = Utils.randomNameGenerator("SAVINGS_PRODUCT_", 6);
-    private String shortName = Utils.randomNameGenerator("", 4);
-    private String description = Utils.randomNameGenerator("", 20);
+    private String nameOfSavingsProduct = Utils.uniqueRandomStringGenerator("SAVINGS_PRODUCT_", 6);
+    private String shortName = Utils.uniqueRandomStringGenerator("", 4);
+    private String description = Utils.randomStringGenerator("", 20);
     private String interestCompoundingPeriodType = "4";
     private String interestPostingPeriodType = "4";
     private String interestCalculationType = INTEREST_CALCULATION_USING_DAILY_BALANCE;
@@ -96,6 +96,7 @@ public class SavingsProductHelper {
     private String daysToEscheat = null;
     private Boolean withgsimID = null;
     private Integer gsimID = null;
+    private String nominalAnnualInterestRateOverdraft = null;
 
     public String build() {
         final HashMap<String, String> map = new HashMap<>();
@@ -134,6 +135,7 @@ public class SavingsProductHelper {
         map.put("lienAllowed", this.lienAllowed);
         map.put("maxAllowedLienLimit", this.maxAllowedLienLimit);
         map.put("withHoldTax", this.withHoldTax.toString());
+        map.put("nominalAnnualInterestRateOverdraft", this.nominalAnnualInterestRateOverdraft);
 
         if (withHoldTax) {
             map.put("taxGroupId", taxGroupId);
@@ -239,6 +241,13 @@ public class SavingsProductHelper {
     public SavingsProductHelper withOverDraft(final String overdraftLimit) {
         this.allowOverdraft = "true";
         this.overdraftLimit = overdraftLimit;
+        return this;
+    }
+
+    public SavingsProductHelper withOverDraftRate(final String overdraftLimit, String nominalAnnualInterestRateOverdraft) {
+        this.allowOverdraft = "true";
+        this.overdraftLimit = overdraftLimit;
+        this.nominalAnnualInterestRateOverdraft = nominalAnnualInterestRateOverdraft;
         return this;
     }
 

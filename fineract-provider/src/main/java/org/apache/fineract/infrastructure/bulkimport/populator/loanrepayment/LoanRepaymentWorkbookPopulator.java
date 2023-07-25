@@ -18,11 +18,10 @@
  */
 package org.apache.fineract.infrastructure.bulkimport.populator.loanrepayment;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,12 +46,9 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddressList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class LoanRepaymentWorkbookPopulator extends AbstractWorkbookPopulator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(LoanRepaymentWorkbookPopulator.class);
     private final OfficeSheetPopulator officeSheetPopulator;
     private final ClientSheetPopulator clientSheetPopulator;
     private final ExtrasSheetPopulator extrasSheetPopulator;
@@ -84,8 +80,8 @@ public class LoanRepaymentWorkbookPopulator extends AbstractWorkbookPopulator {
         clientIdToClientExternalId = new HashMap<>();
         List<ClientData> allclients = clientSheetPopulator.getClients();
         for (ClientData client : allclients) {
-            if (client.getExternalId() != null) {
-                clientIdToClientExternalId.put(client.getId(), client.getExternalId());
+            if (!client.getExternalId().isEmpty()) {
+                clientIdToClientExternalId.put(client.getId(), client.getExternalId().getValue());
             }
         }
     }
@@ -229,28 +225,21 @@ public class LoanRepaymentWorkbookPopulator extends AbstractWorkbookPopulator {
         CellStyle dateCellStyle = workbook.createCellStyle();
         short df = workbook.createDataFormat().getFormat(dateFormat);
         dateCellStyle.setDataFormat(df);
-        SimpleDateFormat outputFormat = new SimpleDateFormat(dateFormat);
-        SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
-        Date date = null;
+        DateTimeFormatter outputFormat = new DateTimeFormatterBuilder().appendPattern(dateFormat).toFormatter();
         Collections.sort(allloans, new LoanComparatorByStatusActive());
         for (LoanAccountData loan : allloans) {
             row = loanRepaymentSheet.createRow(rowIndex++);
             writeString(LoanRepaymentConstants.LOOKUP_CLIENT_NAME_COL, row, loan.getClientName() + "(" + loan.getClientId() + ")");
             writeString(LoanRepaymentConstants.LOOKUP_CLIENT_EXTERNAL_ID, row, clientIdToClientExternalId.get(loan.getClientId()));
-            writeString(LoanRepaymentConstants.LOOKUP_ACCOUNT_NO_COL, row, loan.getAccountNo() + "-" + loan.getStatusStringValue());
+            writeString(LoanRepaymentConstants.LOOKUP_ACCOUNT_NO_COL, row, loan.getAccountNo() + "-" + loan.getStatus().getValue());
             writeString(LoanRepaymentConstants.LOOKUP_PRODUCT_COL, row, loan.getLoanProductName());
             writeDouble(LoanRepaymentConstants.LOOKUP_PRINCIPAL_COL, row, loan.getPrincipal().doubleValue());
-            if (loan.getTotalOutstandingAmount() != null) {
-                writeBigDecimal(LoanRepaymentConstants.LOOKUP_TOTAL_OUTSTANDING_AMOUNT_COL, row, loan.getTotalOutstandingAmount());
+            if (loan.getSummary() != null && loan.getSummary().getTotalOutstanding() != null) {
+                writeBigDecimal(LoanRepaymentConstants.LOOKUP_TOTAL_OUTSTANDING_AMOUNT_COL, row, loan.getSummary().getTotalOutstanding());
             }
-            if (loan.getDisbursementDate() != null) {
-                try {
-                    date = inputFormat.parse(loan.getDisbursementDate().toString());
-                } catch (ParseException e) {
-                    LOG.error("Problem occurred in populateLoansTable function", e);
-                }
-                writeDate(LoanRepaymentConstants.LOOKUP_LOAN_DISBURSEMENT_DATE_COL, row, outputFormat.format(date), dateCellStyle,
-                        dateFormat);
+            if (loan.getTimeline() != null && loan.getTimeline().getDisbursementDate() != null) {
+                writeDate(LoanRepaymentConstants.LOOKUP_LOAN_DISBURSEMENT_DATE_COL, row,
+                        outputFormat.format(loan.getTimeline().getDisbursementDate()), dateCellStyle, dateFormat);
             }
         }
     }

@@ -18,21 +18,27 @@
  */
 package org.apache.fineract.infrastructure.gcm.domain;
 
-import java.util.Date;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToOne;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.portfolio.client.domain.Client;
 
 @Entity
 @Table(name = "client_device_registration")
-public final class DeviceRegistration extends AbstractPersistableCustom {
+@Getter
+@Setter
+@NoArgsConstructor
+@Accessors(chain = true)
+public class DeviceRegistration extends AbstractPersistableCustom {
 
     @OneToOne
     @JoinColumn(name = "client_id", nullable = false, unique = true)
@@ -42,43 +48,11 @@ public final class DeviceRegistration extends AbstractPersistableCustom {
     private String registrationId;
 
     @Column(name = "updatedon_date", nullable = false)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updatedOnDate;
-
-    private DeviceRegistration() {}
-
-    private DeviceRegistration(final Client client, final String registrationId) {
-        this.client = client;
-        this.registrationId = registrationId;
-        this.updatedOnDate = Date.from(DateUtils.getLocalDateTimeOfTenant().atZone(DateUtils.getDateTimeZoneOfTenant()).toInstant());
-    }
+    private LocalDateTime updatedOnDate;
 
     public static DeviceRegistration instance(final Client client, final String registrationId) {
-        return new DeviceRegistration(client, registrationId);
-    }
-
-    public Client getClient() {
-        return this.client;
-    }
-
-    public void setClient(Client client) {
-        this.client = client;
-    }
-
-    public String getRegistrationId() {
-        return this.registrationId;
-    }
-
-    public void setRegistrationId(String registrationId) {
-        this.registrationId = registrationId;
-    }
-
-    public Date getUpdatedOnDate() {
-        return this.updatedOnDate;
-    }
-
-    public void setUpdatedOnDate(Date updatedOnDate) {
-        this.updatedOnDate = updatedOnDate;
+        return new DeviceRegistration().setRegistrationId(registrationId).setClient(client)
+                .setUpdatedOnDate(DateUtils.getLocalDateTimeOfTenant());
     }
 
 }

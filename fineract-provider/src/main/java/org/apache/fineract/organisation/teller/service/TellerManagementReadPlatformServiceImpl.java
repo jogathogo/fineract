@@ -22,9 +22,8 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Iterator;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -67,7 +66,6 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
     private final JdbcTemplate jdbcTemplate;
     private final PlatformSecurityContext context;
     private final TellerLookupMapper lookupMapper = new TellerLookupMapper();
-    private final TellerInOfficeHierarchyMapper tellerInOfficeHierarchyMapper = new TellerInOfficeHierarchyMapper();
     private final OfficeReadPlatformService officeReadPlatformService;
     private final StaffReadPlatformService staffReadPlatformService;
     private final CurrencyReadPlatformService currencyReadPlatformService;
@@ -111,33 +109,6 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
 
             return TellerData.instance(id, officeId, debitAccountId, creditAccountId, tellerName, description, startDate, endDate,
                     tellerStatus, officeName, null, null);
-        }
-    }
-
-    private static final class TellerInOfficeHierarchyMapper implements RowMapper<TellerData> {
-
-        @Override
-        public TellerData mapRow(final ResultSet rs, final int rowNum) throws SQLException {
-
-            final Long id = rs.getLong("id");
-            final String tellerName = rs.getString("teller_name");
-            final String description = rs.getString("description");
-            final String officeName = rs.getString("office_name");
-            final Long officeId = rs.getLong("office_id");
-            TellerStatus tellerStatus = null;
-            final Integer status = rs.getInt("status");
-            if (status != null) {
-                tellerStatus = TellerStatus.fromInt(status);
-            }
-            final Long debitAccountId = rs.getLong("debit_account_id");
-            final Long creditAccountId = rs.getLong("credit_account_id");
-
-            final LocalDate startDate = JdbcSupport.getLocalDate(rs, "start_date");
-            final LocalDate endDate = JdbcSupport.getLocalDate(rs, "end_date");
-
-            return TellerData.instance(id, officeId, debitAccountId, creditAccountId, tellerName, description, startDate, endDate,
-                    tellerStatus, officeName, null, null);
-
         }
     }
 
@@ -256,7 +227,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
     }
 
     @Override
-    public Collection<CashierData> getCashiersForTeller(Long tellerId, Date fromDate, Date toDate) {
+    public Collection<CashierData> getCashiersForTeller(Long tellerId, LocalDate fromDate, LocalDate toDate) {
         return retrieveCashiersForTellers(null, tellerId);
     }
 
@@ -312,13 +283,13 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
     }
 
     @Override
-    public Collection<CashierData> getCashierData(Long officeId, Long tellerId, Long staffId, Date date) {
+    public Collection<CashierData> getCashierData(Long officeId, Long tellerId, Long staffId, LocalDate date) {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Collection<CashierData> getTellerCashiers(Long tellerId, Date date) {
+    public Collection<CashierData> getTellerCashiers(Long tellerId, LocalDate date) {
         // TODO Auto-generated method stub
         return null;
     }
@@ -330,19 +301,19 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
     }
 
     @Override
-    public Collection<TellerTransactionData> fetchTellerTransactionsByTellerId(Long tellerId, Date fromDate, Date toDate) {
+    public Collection<TellerTransactionData> fetchTellerTransactionsByTellerId(Long tellerId, LocalDate fromDate, LocalDate toDate) {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Collection<TellerJournalData> getJournals(Long officeId, Long tellerId, Long cashierId, Date dateFrom, Date dateTo) {
+    public Collection<TellerJournalData> getJournals(Long officeId, Long tellerId, Long cashierId, LocalDate dateFrom, LocalDate dateTo) {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Collection<TellerJournalData> fetchTellerJournals(Long tellerId, Long cashierId, Date fromDate, Date toDate) {
+    public Collection<TellerJournalData> fetchTellerJournals(Long tellerId, Long cashierId, LocalDate fromDate, LocalDate toDate) {
         // TODO Auto-generated method stub
         return null;
     }
@@ -370,7 +341,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         final OfficeData officeData = this.officeReadPlatformService.retrieveOffice(defaultOfficeId);
         String officeName = "";
         if (officeData != null) {
-            officeName = officeData.name();
+            officeName = officeData.getName();
         }
 
         TellerData tellerData = findTeller(tellerId);
@@ -378,8 +349,6 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         if (tellerData != null) {
             tellerName = tellerData.getName();
         }
-
-        final Collection<OfficeData> offices = this.officeReadPlatformService.retrieveAllOfficesForDropdown();
 
         Collection<StaffData> staffOptions = null;
 
@@ -404,8 +373,8 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
         String cashierName = "";
         Long officeId = null;
         Long tellerId = null;
-        Date startDate = null;
-        Date endDate = null;
+        LocalDate startDate = null;
+        LocalDate endDate = null;
 
         CashierData cashierData = findCashier(cashierId);
         if (cashierData != null) {
@@ -430,7 +399,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
 
     @Override
     public CashierTransactionsWithSummaryData retrieveCashierTransactionsWithSummary(final Long cashierId, final boolean includeAllTellers,
-            final Date fromDate, final Date toDate, final String currencyCode, final SearchParameters searchParameters) {
+            final LocalDate fromDate, final LocalDate toDate, final String currencyCode, final SearchParameters searchParameters) {
         CashierData cashierData = findCashier(cashierId);
         Long staffId = cashierData.getStaffId();
         StaffData staffData = staffReadPlatformService.retrieveStaff(staffId);
@@ -483,7 +452,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
 
     @Override
     public Page<CashierTransactionData> retrieveCashierTransactions(final Long cashierId, final boolean includeAllTellers,
-            final Date fromDate, final Date toDate, final String currencyCode, final SearchParameters searchParameters) {
+            final LocalDate fromDate, final LocalDate toDate, final String currencyCode, final SearchParameters searchParameters) {
         CashierData cashierData = findCashier(cashierId);
         Long staffId = cashierData.getStaffId();
         StaffData staffData = staffReadPlatformService.retrieveStaff(staffId);
@@ -565,17 +534,12 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
 
             final LocalDate startDate = JdbcSupport.getLocalDate(rs, "start_date");
             final LocalDate endDate = JdbcSupport.getLocalDate(rs, "end_date");
-            final Integer fullDayFromDB = rs.getInt("full_day");
-            Boolean fullDay = false;
-            if (fullDayFromDB == 1) {
-                fullDay = true;
-            }
+            final Boolean fullDay = rs.getBoolean("full_day");
             final String startTime = rs.getString("start_time");
             final String endTime = rs.getString("end_time");
 
-            return CashierData.instance(id, null, null, staffId, staffName, tellerId, tellerName, description,
-                    Date.from(startDate.atStartOfDay(ZoneId.systemDefault()).toInstant()),
-                    Date.from(endDate.atStartOfDay(ZoneId.systemDefault()).toInstant()), fullDay, startTime, endTime);
+            return CashierData.instance(id, null, null, staffId, staffName, tellerId, tellerName, description, startDate, endDate, fullDay,
+                    startTime, endTime);
         }
     }
 
@@ -664,7 +628,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append(" left join m_loan loan on loan_txn.loan_id = loan.id ");
             sqlBuilder.append(" left join m_client cl on loan.client_id = cl.id ");
             sqlBuilder.append(" left join m_office o on cl.office_id = o.id ");
-            sqlBuilder.append(" left join m_appuser user on loan_txn.appuser_id = user.id ");
+            sqlBuilder.append(" left join m_appuser user on loan_txn.created_by = user.id ");
             sqlBuilder.append(" left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append(" left join m_cashiers c on c.staff_id = staff.id ");
             sqlBuilder.append(" left join m_payment_detail payDetails on payDetails.id = loan_txn.payment_detail_id ");
@@ -700,7 +664,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
                     " left join r_enum_value renum on cli_txn.transaction_type_enum = renum.enum_id AND renum.enum_name = 'client_transaction_type_enum' ");
             sqlBuilder.append(" left join m_client cl on cli_txn.client_id = cl.id ");
             sqlBuilder.append(" left join m_office o on cl.office_id = o.id ");
-            sqlBuilder.append(" left join m_appuser user on cli_txn.appuser_id = user.id ");
+            sqlBuilder.append(" left join m_appuser user on cli_txn.created_by = user.id ");
             sqlBuilder.append(" left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append(" left join m_cashiers c on c.staff_id = staff.id ");
             sqlBuilder.append(" left join m_payment_detail payDetails on payDetails.id = cli_txn.payment_detail_id ");
@@ -721,15 +685,15 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             final String txnNote = rs.getString("txn_note");
             final String entityType = rs.getString("entity_type");
             final Long entityId = rs.getLong("entity_id");
-            final LocalDate createdLocalDate = JdbcSupport.getLocalDate(rs, "created_date");
+            final OffsetDateTime createdLocalDate = JdbcSupport.getOffsetDateTime(rs, "created_date");
 
-            Date txnDate = null;
+            LocalDate txnDate = null;
             if (txnLocalDate != null) {
-                txnDate = Date.from(txnLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                txnDate = txnLocalDate;
             }
-            Date createdDate = null;
+            OffsetDateTime createdDate = null;
             if (createdLocalDate != null) {
-                createdDate = Date.from(createdLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                createdDate = createdLocalDate;
             }
 
             final Long officeId = rs.getLong("office_id");
@@ -829,7 +793,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
             sqlBuilder.append("    left join m_loan loan on loan_txn.loan_id = loan.id ");
             sqlBuilder.append("    left join m_client cl on loan.client_id = cl.id ");
             sqlBuilder.append("    left join m_office o on cl.office_id = o.id ");
-            sqlBuilder.append("    left join m_appuser user on loan_txn.appuser_id = user.id ");
+            sqlBuilder.append("    left join m_appuser user on loan_txn.created_by = user.id ");
             sqlBuilder.append("    left join m_staff staff on user.staff_id = staff.id ");
             sqlBuilder.append("    left join m_cashiers c on c.staff_id = staff.id ");
             sqlBuilder.append(" left join m_payment_detail payDetails on payDetails.id = loan_txn.payment_detail_id ");
@@ -866,7 +830,7 @@ public class TellerManagementReadPlatformServiceImpl implements TellerManagement
                     "    left join r_enum_value renum ON cli_txn.transaction_type_enum = renum.enum_id AND renum.enum_name = 'client_transaction_type_enum' ");
             sqlBuilder.append("    left join m_client cl ON cli_txn.client_id = cl.id ");
             sqlBuilder.append("    left join m_office o ON cl.office_id = o.id ");
-            sqlBuilder.append("    left join m_appuser user ON cli_txn.appuser_id = user.id ");
+            sqlBuilder.append("    left join m_appuser user ON cli_txn.created_by = user.id ");
             sqlBuilder.append("    left join m_staff staff ON user.staff_id = staff.id ");
             sqlBuilder.append("    left join m_cashiers c ON c.staff_id = staff.id ");
             sqlBuilder.append(" left join m_payment_detail payDetails on payDetails.id = cli_txn.payment_detail_id ");

@@ -18,13 +18,22 @@
  */
 package org.apache.fineract.notification.domain;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 
 @Entity
 @Table(name = "notification_generator")
+@Getter
+@Setter
+@NoArgsConstructor
+@Accessors(chain = true)
 public class Notification extends AbstractPersistableCustom {
 
     @Column(name = "object_type")
@@ -46,73 +55,5 @@ public class Notification extends AbstractPersistableCustom {
     private String notificationContent;
 
     @Column(name = "created_at")
-    private String createdAt;
-
-    public Notification() {}
-
-    public Notification(String objectType, Long objectIdentifier, String action, Long actorId, boolean isSystemGenerated,
-            String notificationContent, String createdAt) {
-        this.objectType = objectType;
-        this.objectIdentifier = objectIdentifier;
-        this.action = action;
-        this.actorId = actorId;
-        this.isSystemGenerated = isSystemGenerated;
-        this.notificationContent = notificationContent;
-        this.createdAt = createdAt;
-    }
-
-    public String getObjectType() {
-        return objectType;
-    }
-
-    public void setObjectType(String objectType) {
-        this.objectType = objectType;
-    }
-
-    public Long getObjectIdentifier() {
-        return objectIdentifier;
-    }
-
-    public void setObjectIdentifier(Long objectIdentifier) {
-        this.objectIdentifier = objectIdentifier;
-    }
-
-    public String getAction() {
-        return action;
-    }
-
-    public void setAction(String action) {
-        this.action = action;
-    }
-
-    public Long getActor() {
-        return actorId;
-    }
-
-    public void setActor(Long actorId) {
-        this.actorId = actorId;
-    }
-
-    public boolean isSystemGenerated() {
-        return isSystemGenerated;
-    }
-
-    public void setSystemGenerated(boolean systemGenerated) {
-        isSystemGenerated = systemGenerated;
-    }
-
-    public String getNotificationContent() {
-        return notificationContent;
-    }
-
-    public void setNotificationContent(String notificationContent) {
-        this.notificationContent = notificationContent;
-    }
-
-    @Override
-    public String toString() {
-        return "Notification [objectType=" + this.objectType + ", objectIdentifier=" + this.objectIdentifier + ", action=" + this.action
-                + ", actorId=" + this.actorId + ", isSystemGenerated=" + this.isSystemGenerated + ", notificationContent="
-                + this.notificationContent + ", createdAt=" + this.createdAt + ", getId()=" + this.getId() + "]";
-    }
+    private LocalDateTime createdAt;
 }

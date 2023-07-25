@@ -33,13 +33,16 @@ import java.text.DecimalFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
+import java.util.TimeZone;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.CollateralManagementHelper;
 import org.apache.fineract.integrationtests.common.CommonConstants;
@@ -57,6 +60,7 @@ import org.apache.fineract.integrationtests.common.fixeddeposit.FixedDepositProd
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanStatusChecker;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.apache.fineract.integrationtests.common.recurringdeposit.RecurringDepositAccountHelper;
 import org.apache.fineract.integrationtests.common.recurringdeposit.RecurringDepositAccountStatusChecker;
@@ -66,13 +70,13 @@ import org.apache.fineract.integrationtests.common.savings.SavingsProductHelper;
 import org.apache.fineract.integrationtests.common.savings.SavingsStatusChecker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({ "unchecked" })
-@Order(2)
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class AccountingScenarioIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(AccountingScenarioIntegrationTest.class);
@@ -110,18 +114,19 @@ public class AccountingScenarioIntegrationTest {
     private AccountHelper accountHelper;
     private JournalEntryHelper journalEntryHelper;
     private SavingsAccountHelper savingsAccountHelper;
-    private FixedDepositProductHelper fixedDepositProductHelper;
     private FixedDepositAccountHelper fixedDepositAccountHelper;
-    private RecurringDepositProductHelper recurringDepositProductHelper;
     private RecurringDepositAccountHelper recurringDepositAccountHelper;
     private SchedulerJobHelper schedulerJobHelper;
     private PeriodicAccrualAccountingHelper periodicAccrualAccountingHelper;
+
+    private TimeZone systemTimeZone;
 
     @BeforeEach
     public void setup() {
         Utils.initializeRESTAssured();
         requestSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
         requestSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey());
+        requestSpec.header("Fineract-Platform-TenantId", "default");
         responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
 
         this.loanTransactionHelper = new LoanTransactionHelper(requestSpec, responseSpec);
@@ -129,6 +134,8 @@ public class AccountingScenarioIntegrationTest {
         this.journalEntryHelper = new JournalEntryHelper(requestSpec, responseSpec);
         this.schedulerJobHelper = new SchedulerJobHelper(requestSpec);
         this.periodicAccrualAccountingHelper = new PeriodicAccrualAccountingHelper(requestSpec, responseSpec);
+
+        this.systemTimeZone = TimeZone.getTimeZone(Utils.TENANT_TIME_ZONE);
     }
 
     @Test
@@ -161,7 +168,7 @@ public class AccountingScenarioIntegrationTest {
         LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(EXPECTED_DISBURSAL_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(EXPECTED_DISBURSAL_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
@@ -361,31 +368,26 @@ public class AccountingScenarioIntegrationTest {
 
     @Test
     public void testFixedDepositAccountingFlow() {
-        this.fixedDepositProductHelper = new FixedDepositProductHelper(requestSpec, responseSpec);
         this.accountHelper = new AccountHelper(requestSpec, responseSpec);
         this.savingsAccountHelper = new SavingsAccountHelper(requestSpec, responseSpec);
         this.fixedDepositAccountHelper = new FixedDepositAccountHelper(requestSpec, responseSpec);
 
-        DateFormat dateFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
-        DateFormat currentDateFormat = new SimpleDateFormat("dd");
+        final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.US);
 
-        Calendar todaysDate = Calendar.getInstance();
-        todaysDate.add(Calendar.MONTH, -3);
-        final String VALID_FROM = dateFormat.format(todaysDate.getTime());
-        todaysDate.add(Calendar.YEAR, 10);
-        final String VALID_TO = dateFormat.format(todaysDate.getTime());
+        LocalDate todaysDate = Utils.getLocalDateOfTenant();
+        todaysDate = todaysDate.minusMonths(3);
+        final String VALID_FROM = dateFormat.format(todaysDate);
+        todaysDate = todaysDate.plusYears(10);
+        final String VALID_TO = dateFormat.format(todaysDate);
 
-        todaysDate = Calendar.getInstance();
-        todaysDate.add(Calendar.MONTH, -1);
-        final String SUBMITTED_ON_DATE = dateFormat.format(todaysDate.getTime());
-        final String APPROVED_ON_DATE = dateFormat.format(todaysDate.getTime());
-        final String ACTIVATION_DATE = dateFormat.format(todaysDate.getTime());
+        todaysDate = Utils.getLocalDateOfTenant();
+        todaysDate = todaysDate.minusMonths(1);
+        final String SUBMITTED_ON_DATE = dateFormat.format(todaysDate);
+        final String APPROVED_ON_DATE = dateFormat.format(todaysDate);
+        final String ACTIVATION_DATE = dateFormat.format(todaysDate);
 
-        Integer currentDate = Integer.valueOf(currentDateFormat.format(todaysDate.getTime()));
-        Integer daysInMonth = todaysDate.getActualMaximum(Calendar.DATE);
-        Integer numberOfDaysLeft = (daysInMonth - currentDate) + 1;
-        todaysDate.add(Calendar.DATE, numberOfDaysLeft);
-        final String INTEREST_POSTED_DATE = dateFormat.format(todaysDate.getTime());
+        todaysDate = todaysDate.plusMonths(1).withDayOfMonth(1);
+        final String INTEREST_POSTED_DATE = dateFormat.format(todaysDate);
 
         final Account assetAccount = this.accountHelper.createAssetAccount();
         final Account incomeAccount = this.accountHelper.createIncomeAccount();
@@ -440,7 +442,6 @@ public class AccountingScenarioIntegrationTest {
 
     @Test
     public void testRecurringDepositAccountingFlow() {
-        this.recurringDepositProductHelper = new RecurringDepositProductHelper(requestSpec, responseSpec);
         this.accountHelper = new AccountHelper(requestSpec, responseSpec);
         this.recurringDepositAccountHelper = new RecurringDepositAccountHelper(requestSpec, responseSpec);
 
@@ -449,27 +450,23 @@ public class AccountingScenarioIntegrationTest {
         final Account expenseAccount = this.accountHelper.createExpenseAccount();
         final Account liabilityAccount = this.accountHelper.createLiabilityAccount();
 
-        DateFormat dateFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
-        DateFormat currentDateFormat = new SimpleDateFormat("dd");
+        final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.US);
 
-        Calendar todaysDate = Calendar.getInstance();
-        todaysDate.add(Calendar.MONTH, -3);
-        final String VALID_FROM = dateFormat.format(todaysDate.getTime());
-        todaysDate.add(Calendar.YEAR, 10);
-        final String VALID_TO = dateFormat.format(todaysDate.getTime());
+        LocalDate todaysDate = Utils.getLocalDateOfTenant();
+        todaysDate = todaysDate.minusMonths(3);
+        final String VALID_FROM = dateFormat.format(todaysDate);
+        todaysDate = todaysDate.plusYears(10);
+        final String VALID_TO = dateFormat.format(todaysDate);
 
-        todaysDate = Calendar.getInstance();
-        todaysDate.add(Calendar.MONTH, -1);
-        final String SUBMITTED_ON_DATE = dateFormat.format(todaysDate.getTime());
-        final String APPROVED_ON_DATE = dateFormat.format(todaysDate.getTime());
-        final String ACTIVATION_DATE = dateFormat.format(todaysDate.getTime());
-        final String EXPECTED_FIRST_DEPOSIT_ON_DATE = dateFormat.format(todaysDate.getTime());
+        todaysDate = Utils.getLocalDateOfTenant();
+        todaysDate = todaysDate.minusMonths(1);
+        final String SUBMITTED_ON_DATE = dateFormat.format(todaysDate);
+        final String APPROVED_ON_DATE = dateFormat.format(todaysDate);
+        final String ACTIVATION_DATE = dateFormat.format(todaysDate);
+        final String EXPECTED_FIRST_DEPOSIT_ON_DATE = dateFormat.format(todaysDate);
 
-        Integer currentDate = Integer.valueOf(currentDateFormat.format(todaysDate.getTime()));
-        Integer daysInMonth = todaysDate.getActualMaximum(Calendar.DATE);
-        Integer numberOfDaysLeft = (daysInMonth - currentDate) + 1;
-        todaysDate.add(Calendar.DATE, numberOfDaysLeft);
-        final String INTEREST_POSTED_DATE = dateFormat.format(todaysDate.getTime());
+        todaysDate = todaysDate.plusMonths(1).withDayOfMonth(1);
+        final String INTEREST_POSTED_DATE = dateFormat.format(todaysDate);
 
         Integer clientId = ClientHelper.createClient(requestSpec, responseSpec);
         ClientHelper.verifyClientCreatedOnServer(requestSpec, responseSpec, clientId);
@@ -599,7 +596,7 @@ public class AccountingScenarioIntegrationTest {
         LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(EXPECTED_DISBURSAL_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(EXPECTED_DISBURSAL_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
@@ -723,7 +720,7 @@ public class AccountingScenarioIntegrationTest {
         LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(EXPECTED_DISBURSAL_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(EXPECTED_DISBURSAL_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
@@ -806,31 +803,25 @@ public class AccountingScenarioIntegrationTest {
         LoanStatusChecker.verifyLoanIsApproved(loanStatusHashMap);
         LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
 
-        DateFormat dateFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
+        final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.US);
 
-        Calendar todayDate = Calendar.getInstance();
-        final String currentDate = dateFormat.format(todayDate.getTime());
+        final LocalDate localDate = LocalDate.now(this.systemTimeZone.toZoneId());
+        final ZonedDateTime currentDate = ZonedDateTime.of(localDate, LocalTime.MIDNIGHT, this.systemTimeZone.toZoneId());
+        ZonedDateTime zonedDate = currentDate.minusDays(4);
+        final String LOAN_DISBURSEMENT_DATE = dateFormat.format(zonedDate);
 
-        todayDate.add(Calendar.DATE, -4);
-
-        final String LOAN_DISBURSEMENT_DATE = dateFormat.format(todayDate.getTime());
-
-        todayDate.add(Calendar.MONTH, 2);
-        final String FIRST_REPAYMENT_DATE = dateFormat.format(todayDate.getTime());
-
-        todayDate = Calendar.getInstance();
-        todayDate.add(Calendar.DATE, -2);
+        zonedDate = currentDate.minusDays(2);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(LOAN_DISBURSEMENT_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(LOAN_DISBURSEMENT_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
         this.loanTransactionHelper.addChargesForLoan(loanID, LoanTransactionHelper.getSpecifiedDueDateChargesForLoanAsJSON(
-                String.valueOf(flatSpecifiedDueDate), dateFormat.format(todayDate.getTime()), String.valueOf(PENALTY_PORTION)));
-        todayDate.add(Calendar.DATE, 1);
-        this.loanTransactionHelper.addChargesForLoan(loanID, LoanTransactionHelper.getSpecifiedDueDateChargesForLoanAsJSON(
-                String.valueOf(flat), dateFormat.format(todayDate.getTime()), String.valueOf(FEE_PORTION)));
+                String.valueOf(flatSpecifiedDueDate), dateFormat.format(zonedDate), String.valueOf(PENALTY_PORTION)));
+        zonedDate = zonedDate.plusDays(1);
+        this.loanTransactionHelper.addChargesForLoan(loanID, LoanTransactionHelper
+                .getSpecifiedDueDateChargesForLoanAsJSON(String.valueOf(flat), dateFormat.format(zonedDate), String.valueOf(FEE_PORTION)));
 
         // CHECK ACCOUNT ENTRIES
         LOG.info("Entries ......");
@@ -847,13 +838,13 @@ public class AccountingScenarioIntegrationTest {
         final ArrayList<HashMap> loanSchedule = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, responseSpec, loanID);
         // MAKE 1
         List fromDateList = (List) loanSchedule.get(1).get("fromDate");
-        LocalDate fromDateLocal = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
+        LocalDate fromDateLocal = LocalDate.now(Utils.getZoneIdOfTenant());
         fromDateLocal = fromDateLocal.withYear((int) fromDateList.get(0));
         fromDateLocal = fromDateLocal.withMonth((int) fromDateList.get(1));
         fromDateLocal = fromDateLocal.withDayOfMonth((int) fromDateList.get(2));
 
         List dueDateList = (List) loanSchedule.get(1).get("dueDate");
-        LocalDate dueDateLocal = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
+        LocalDate dueDateLocal = LocalDate.now(Utils.getZoneIdOfTenant());
         dueDateLocal = dueDateLocal.withYear((int) dueDateList.get(0));
         dueDateLocal = dueDateLocal.withMonth((int) dueDateList.get(1));
         dueDateLocal = dueDateLocal.withDayOfMonth((int) dueDateList.get(2));
@@ -865,7 +856,7 @@ public class AccountingScenarioIntegrationTest {
         float interest4Days = totalInterest / totalDaysInPeriod * 4;
         interest4Days = Float.parseFloat(numberFormat.format(interest4Days));
 
-        this.loanTransactionHelper.checkAccrualTransactionForRepayment(getDateAsLocalDate(currentDate), interest4Days, FEE_PORTION,
+        this.loanTransactionHelper.checkAccrualTransactionForRepayment(currentDate.toLocalDate(), interest4Days, FEE_PORTION,
                 PENALTY_PORTION, loanID);
 
     }
@@ -916,21 +907,19 @@ public class AccountingScenarioIntegrationTest {
 
         DateFormat dateFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
 
-        Calendar todayDate = Calendar.getInstance();
-        final String currentDate = dateFormat.format(todayDate.getTime());
+        Calendar todayDate = Calendar.getInstance(this.systemTimeZone);
 
         todayDate.add(Calendar.DATE, -4);
 
         final String LOAN_DISBURSEMENT_DATE = dateFormat.format(todayDate.getTime());
 
         todayDate.add(Calendar.MONTH, 2);
-        final String FIRST_REPAYMENT_DATE = dateFormat.format(todayDate.getTime());
 
-        todayDate = Calendar.getInstance();
+        todayDate = Calendar.getInstance(this.systemTimeZone);
         todayDate.add(Calendar.DATE, -2);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(LOAN_DISBURSEMENT_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(LOAN_DISBURSEMENT_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
@@ -962,13 +951,13 @@ public class AccountingScenarioIntegrationTest {
         final ArrayList<HashMap> loanSchedule = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, responseSpec, loanID);
         // MAKE 1
         List fromDateList = (List) loanSchedule.get(1).get("fromDate");
-        LocalDate fromDateLocal = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
+        LocalDate fromDateLocal = LocalDate.now(Utils.getZoneIdOfTenant());
         fromDateLocal = fromDateLocal.withYear((int) fromDateList.get(0));
         fromDateLocal = fromDateLocal.withMonth((int) fromDateList.get(1));
         fromDateLocal = fromDateLocal.withDayOfMonth((int) fromDateList.get(2));
 
         List dueDateList = (List) loanSchedule.get(1).get("dueDate");
-        LocalDate dueDateLocal = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
+        LocalDate dueDateLocal = LocalDate.now(Utils.getZoneIdOfTenant());
         dueDateLocal = dueDateLocal.withYear((int) dueDateList.get(0));
         dueDateLocal = dueDateLocal.withMonth((int) dueDateList.get(1));
         dueDateLocal = dueDateLocal.withDayOfMonth((int) dueDateList.get(2));
@@ -1032,7 +1021,7 @@ public class AccountingScenarioIntegrationTest {
         LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
 
         String loanDetails = this.loanTransactionHelper.getLoanDetails(requestSpec, responseSpec, loanID);
-        loanStatusHashMap = this.loanTransactionHelper.disburseLoan(EXPECTED_DISBURSAL_DATE, loanID,
+        loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(EXPECTED_DISBURSAL_DATE, loanID,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
         LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
 
@@ -1122,11 +1111,8 @@ public class AccountingScenarioIntegrationTest {
         return this.loanTransactionHelper.getLoanProductId(loanProductJSON);
     }
 
-    private LocalDate getDateAsLocalDate(String dateAsString) throws ParseException {
-        DateFormat df = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
-        LocalDate date = LocalDate.ofInstant(df.parse(dateAsString).toInstant(), DateUtils.getDateTimeZoneOfTenant());
-
-        return date;
+    private LocalDate getDateAsLocalDate(String dateAsString) {
+        return LocalDate.parse(dateAsString, Utils.dateFormatter);
     }
 
 }

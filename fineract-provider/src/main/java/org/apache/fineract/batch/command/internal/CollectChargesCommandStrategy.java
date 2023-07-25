@@ -18,16 +18,17 @@
  */
 package org.apache.fineract.batch.command.internal;
 
+import static org.apache.fineract.batch.command.CommandStrategyUtils.relativeUrlWithoutVersion;
+
 import com.google.common.base.Splitter;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.List;
-import javax.ws.rs.core.UriInfo;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.batch.command.CommandStrategy;
 import org.apache.fineract.batch.domain.BatchRequest;
 import org.apache.fineract.batch.domain.BatchResponse;
-import org.apache.fineract.batch.exception.ErrorHandler;
-import org.apache.fineract.batch.exception.ErrorInfo;
 import org.apache.fineract.portfolio.loanaccount.api.LoanChargesApiResource;
+import org.apache.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,8 +38,6 @@ import org.springframework.stereotype.Component;
  * will also catch any errors raised by {@link org.apache.fineract.portfolio.loanaccount.api.LoanChargesApiResource} and
  * map those errors to appropriate status codes in BatchResponse.
  *
- * @author Rishabh Shukla
- *
  * @see org.apache.fineract.batch.command.CommandStrategy
  * @see org.apache.fineract.batch.domain.BatchRequest
  * @see org.apache.fineract.batch.domain.BatchResponse
@@ -47,10 +46,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CollectChargesCommandStrategy implements CommandStrategy {
 
+    /**
+     * Loan charges api resource {@link LoanChargesApiResource}.
+     */
     private final LoanChargesApiResource loanChargesApiResource;
 
     @Override
-    public BatchResponse execute(BatchRequest request, UriInfo uriInfo) {
+    public BatchResponse execute(BatchRequest request, final UriInfo uriInfo) {
 
         final BatchResponse response = new BatchResponse();
         final String responseBody;
@@ -58,33 +60,20 @@ public class CollectChargesCommandStrategy implements CommandStrategy {
         response.setRequestId(request.getRequestId());
         response.setHeaders(request.getHeaders());
 
-        final List<String> pathParameters = Splitter.on('/').splitToList(request.getRelativeUrl());
+        final List<String> pathParameters = Splitter.on('/').splitToList(relativeUrlWithoutVersion(request));
 
         // Pluck out the loanId out of the relative path
-        Long loanId = Long.parseLong(pathParameters.get(1));
+        final Long loanId = Long.parseLong(pathParameters.get(1));
 
-        // Try-catch blocks to map exceptions to appropriate status codes
-        try {
+        // Calls 'retrieveAllLoanCharges' function from
+        // 'LoanChargesApiResource' to Collect
+        // Charges for a loan
+        responseBody = loanChargesApiResource.retrieveAllLoanCharges(loanId, uriInfo);
 
-            // Calls 'retrieveAllLoanCharges' function from
-            // 'LoanChargesApiResource' to Collect
-            // Charges for a loan
-            responseBody = loanChargesApiResource.retrieveAllLoanCharges(loanId, uriInfo);
-
-            response.setStatusCode(200);
-            // Sets the body of the response after Charges have been
-            // successfully collected
-            response.setBody(responseBody);
-
-        } catch (RuntimeException e) {
-
-            // Gets an object of type ErrorInfo, containing information about
-            // raised exception
-            ErrorInfo ex = ErrorHandler.handler(e);
-
-            response.setStatusCode(ex.getStatusCode());
-            response.setBody(ex.getMessage());
-        }
+        response.setStatusCode(HttpStatus.SC_OK);
+        // Sets the body of the response after Charges have been
+        // successfully collected
+        response.setBody(responseBody);
 
         return response;
     }

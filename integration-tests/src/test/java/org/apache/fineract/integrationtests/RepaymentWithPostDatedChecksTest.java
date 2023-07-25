@@ -42,11 +42,14 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanStatusChecker;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class RepaymentWithPostDatedChecksTest {
 
     private ResponseSpecification responseSpec;
@@ -90,8 +93,12 @@ public class RepaymentWithPostDatedChecksTest {
         loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(this.requestSpec, this.responseSpec, loanID);
         LoanStatusChecker.verifyLoanIsApproved(loanStatusHashMap);
 
-        // Get repayments
-        final ArrayList<HashMap> installmentData = this.loanTransactionHelper.getRepayments(loanID);
+        // Get repayments Template for Repayment
+        ArrayList<HashMap> installmentData = this.loanTransactionHelper.getRepayments(loanID);
+        Assertions.assertNotNull(installmentData, "Empty Installment Data Template");
+
+        // Get repayments for Disburse
+        installmentData = this.loanTransactionHelper.getRepayments(loanID);
         Assertions.assertNotNull(installmentData, "Empty Installment Data");
         List<HashMap> postDatedChecks = new ArrayList<>();
         Gson gson = new Gson();
@@ -176,7 +183,7 @@ public class RepaymentWithPostDatedChecksTest {
         map.put("name", "AMANA BANK");
         map.put("amount", amount.toString());
         map.put("accountNo", "900400500621");
-        map.put("checkNo", Utils.randomNumberGenerator(12).toString());
+        map.put("checkNo", Utils.uniqueRandomNumberGenerator(9).toString());
 
         return map;
     }

@@ -23,9 +23,9 @@ import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import org.apache.fineract.infrastructure.bulkimport.constants.TemplatePopulateImportConstants;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.GroupHelper;
@@ -82,7 +82,7 @@ public class LoanWorkbookPopulatorTest {
         Integer outcome_lp_creaion = loanTransactionHelper.getLoanProductId(jsonLoanProduct);
         Assertions.assertNotNull(outcome_lp_creaion, "Could not create Loan Product");
 
-        String jsonFund = "{\n" + "\t\"name\": \"" + Utils.randomNameGenerator("Fund_Name", 9) + "\"\n" + "}";
+        String jsonFund = "{\n" + "\t\"name\": \"" + Utils.uniqueRandomStringGenerator("Fund_Name", 9) + "\"\n" + "}";
         Integer outcome_fund_creation = FundsResourceHandler.createFund(jsonFund, requestSpec, responseSpec);
         Assertions.assertNotNull(outcome_fund_creation, "Could not create Fund");
 

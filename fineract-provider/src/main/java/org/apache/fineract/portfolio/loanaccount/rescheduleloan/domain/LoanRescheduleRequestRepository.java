@@ -18,10 +18,15 @@
  */
 package org.apache.fineract.portfolio.loanaccount.rescheduleloan.domain;
 
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface LoanRescheduleRequestRepository
         extends JpaRepository<LoanRescheduleRequest, Long>, JpaSpecificationExecutor<LoanRescheduleRequest> {
 
+    @Query("select lrr.loan.id from LoanRescheduleRequest lrr where lrr.id = :rescheduleRequestId")
+    Optional<Long> getLoanIdByRescheduleRequestId(@Param("rescheduleRequestId") Long rescheduleRequestId);
 }

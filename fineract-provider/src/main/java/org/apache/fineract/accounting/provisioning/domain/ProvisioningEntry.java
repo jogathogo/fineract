@@ -18,23 +18,29 @@
  */
 package org.apache.fineract.accounting.provisioning.domain;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.useradministration.domain.AppUser;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@Accessors(chain = true)
 @Entity
 @Table(name = "m_provisioning_history")
 public class ProvisioningEntry extends AbstractPersistableCustom {
@@ -50,29 +56,14 @@ public class ProvisioningEntry extends AbstractPersistableCustom {
     private AppUser createdBy;
 
     @Column(name = "created_date")
-    @Temporal(TemporalType.DATE)
-    private Date createdDate;
+    private LocalDate createdDate;
 
     @OneToOne
     @JoinColumn(name = "lastmodifiedby_id")
     private AppUser lastModifiedBy;
 
     @Column(name = "lastmodified_date")
-    @Temporal(TemporalType.DATE)
-    private Date lastModifiedDate;
-
-    protected ProvisioningEntry() {
-
-    }
-
-    public ProvisioningEntry(AppUser createdBy, Date createdDate, AppUser lastModifiedBy, Date lastModifiedDate,
-            Set<LoanProductProvisioningEntry> provisioningEntries) {
-        this.provisioningEntries = provisioningEntries;
-        this.createdBy = createdBy;
-        this.createdDate = createdDate;
-        this.lastModifiedBy = lastModifiedBy;
-        this.lastModifiedDate = lastModifiedDate;
-    }
+    private LocalDate lastModifiedDate;
 
     public void setProvisioningEntries(Collection<LoanProductProvisioningEntry> provisioningEntries) {
         if (this.provisioningEntries == null) {
@@ -83,14 +74,6 @@ public class ProvisioningEntry extends AbstractPersistableCustom {
 
     public Collection<LoanProductProvisioningEntry> getLoanProductProvisioningEntries() {
         return this.provisioningEntries;
-    }
-
-    public void setJournalEntryCreated(Boolean bool) {
-        this.isJournalEntryCreated = bool;
-    }
-
-    public Date getCreatedDate() {
-        return this.createdDate;
     }
 
 }

@@ -37,17 +37,20 @@ import org.apache.fineract.integrationtests.common.GroupHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.apache.fineract.integrationtests.common.organisation.StaffHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Group Test for checking Group: Creation, Activation, Client Association, Updating & Deletion
  */
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class GroupTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(GroupTest.class);
@@ -102,7 +105,7 @@ public class GroupTest {
         Integer groupID = GroupHelper.createGroup(this.requestSpec, this.responseSpec);
         GroupHelper.verifyGroupCreatedOnServer(this.requestSpec, this.responseSpec, groupID);
 
-        final String updateGroupName = Utils.randomNameGenerator("Savings Group Help_", 5);
+        final String updateGroupName = Utils.uniqueRandomStringGenerator("Savings Group Help_", 5);
         groupID = GroupHelper.activateGroup(this.requestSpec, this.responseSpec, groupID.toString());
         Integer updateGroupId = GroupHelper.updateGroup(this.requestSpec, this.responseSpec, updateGroupName, groupID.toString());
 
@@ -138,7 +141,7 @@ public class GroupTest {
 
         this.loanTransactionHelper.approveLoan("20 September 2014", loanId);
         String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, loanId);
-        this.loanTransactionHelper.disburseLoan("20 September 2014", loanId,
+        this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount("20 September 2014", loanId,
                 JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
 
         final HashMap assignStaffAndInheritStaffForClientAccounts = (HashMap) GroupHelper.assignStaffInheritStaffForClientAccounts(

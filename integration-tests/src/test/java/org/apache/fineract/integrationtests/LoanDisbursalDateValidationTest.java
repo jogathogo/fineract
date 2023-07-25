@@ -35,14 +35,17 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanStatusChecker;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("rawtypes")
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class LoanDisbursalDateValidationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanDisbursalDateValidationTest.class);
@@ -96,7 +99,7 @@ public class LoanDisbursalDateValidationTest {
         // DISBURSE A LOAN
         String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, loanID);
         @SuppressWarnings("unchecked")
-        List<HashMap> disbursalError = (List<HashMap>) this.loanTransactionHelper.disburseLoan(disbursalDate, loanID,
+        List<HashMap> disbursalError = (List<HashMap>) this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount(disbursalDate, loanID,
                 this.responseForbiddenError, JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
 
         Assertions.assertEquals(disbursalError.get(0).get(CommonConstants.RESPONSE_ERROR_MESSAGE_CODE),

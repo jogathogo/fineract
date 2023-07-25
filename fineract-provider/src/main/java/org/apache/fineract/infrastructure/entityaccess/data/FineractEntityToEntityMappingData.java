@@ -19,10 +19,17 @@
 package org.apache.fineract.infrastructure.entityaccess.data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDate;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
-public final class FineractEntityToEntityMappingData implements Serializable {
+@Data
+@NoArgsConstructor
+@Accessors(chain = true)
+public class FineractEntityToEntityMappingData implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     @SuppressWarnings("unused")
     private Long mapId;
 
@@ -36,56 +43,33 @@ public final class FineractEntityToEntityMappingData implements Serializable {
     private Long toId;
 
     @SuppressWarnings("unused")
-    private Date startDate;
+    private LocalDate startDate;
 
     @SuppressWarnings("unused")
-    private Date endDate;
+    private LocalDate endDate;
 
     @SuppressWarnings("unused")
-    private final String fromEntity;
+    private String fromEntity;
 
     @SuppressWarnings("unused")
-    private final String toEntity;
-
-    private FineractEntityToEntityMappingData(final Long mapId, final Long relationId, final Long fromId, final Long toId,
-            final Date startDate, final Date endDate, final String fromEntity, final String toEntity) {
-        this.mapId = mapId;
-        this.relationId = relationId;
-        this.fromId = fromId;
-        this.toId = toId;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.fromEntity = fromEntity;
-        this.toEntity = toEntity;
-    }
+    private String toEntity;
 
     public static FineractEntityToEntityMappingData getRelatedEntities(final Long mapId, final Long relationId, final Long fromId,
-            final Long toId, final Date startDate, final Date endDate, final String fromEntity, final String toEntity) {
+            final Long toId, final LocalDate startDate, final LocalDate endDate, final String fromEntity, final String toEntity) {
 
-        return new FineractEntityToEntityMappingData(mapId, relationId, fromId, toId, startDate, endDate, fromEntity, toEntity);
+        return new FineractEntityToEntityMappingData().setMapId(mapId).setRelationId(relationId).setFromId(fromId).setToId(toId)
+                .setStartDate(startDate).setEndDate(endDate).setFromEntity(fromEntity).setToEntity(toEntity);
 
     }
 
     public static FineractEntityToEntityMappingData getRelatedEntities(final Long relationId, final Long fromId, final Long toId,
-            final Date startDate, final Date endDate) {
+            final LocalDate startDate, final LocalDate endDate) {
         final Long mapId = null;
         final String fromEntity = null;
         final String toEntity = null;
 
-        return new FineractEntityToEntityMappingData(mapId, relationId, fromId, toId, startDate, endDate, fromEntity, toEntity);
-
-    }
-
-    public Long getRelationId() {
-        return relationId;
-    }
-
-    public Long getToId() {
-        return toId;
-    }
-
-    public String getFromEntity() {
-        return fromEntity;
+        return new FineractEntityToEntityMappingData().setMapId(mapId).setRelationId(relationId).setFromId(fromId).setToId(toId)
+                .setStartDate(startDate).setEndDate(endDate).setFromEntity(fromEntity).setToEntity(toEntity);
     }
 
 }

@@ -20,24 +20,18 @@ package org.apache.fineract.infrastructure.hooks.data;
 
 import java.io.Serializable;
 import java.util.List;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 @SuppressWarnings("unused")
+@Data
+@NoArgsConstructor
+@Accessors(chain = true)
 public class Entity implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private String name;
-
     private List<String> actions;
-
-    public void setName(final String name) {
-        this.name = name;
-    }
-
-    public void setActions(final List<String> actions) {
-        this.actions = actions;
-    }
-
-    public String getName() {
-        return this.name;
-    }
-
 }

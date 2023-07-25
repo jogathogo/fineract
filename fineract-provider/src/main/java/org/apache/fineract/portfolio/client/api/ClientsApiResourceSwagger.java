@@ -161,6 +161,8 @@ final class ClientsApiResourceSwagger {
             public Integer officeId;
             @Schema(example = "Head Office")
             public String officeName;
+            @Schema(example = "test@test.com")
+            public String emailAddress;
         }
 
         @Schema(example = "2")
@@ -248,6 +250,10 @@ final class ClientsApiResourceSwagger {
         public String savingsProductName;
         @Schema(example = "[]")
         public List<GetClientsGroups> groups;
+        @Schema(example = "test@test.com")
+        public String emailAddress;
+        @Schema(example = "123")
+        public String externalId;
     }
 
     @Schema(description = "PostClientsRequest")
@@ -302,6 +308,8 @@ final class ClientsApiResourceSwagger {
         public String externalId;
         @Schema(example = "Client_LastName")
         public String lastname;
+        @Schema(example = "[2013, 1, 1]")
+        public LocalDate dateOfBirth;
         @Schema(example = "1")
         public Integer groupId;
         @Schema(example = "dd MMMM yyyy")
@@ -312,11 +320,14 @@ final class ClientsApiResourceSwagger {
         public Boolean active;
         @Schema(example = "04 March 2009")
         public String activationDate;
+        @Schema(example = "+353851239876")
+        public String mobileNo;
         @Schema(description = "List of PostClientsDatatable")
         public List<PostClientsDatatable> datatables;
         @Schema(description = "Address requests")
         public List<PostClientsAddressRequest> address;
-
+        @Schema(example = "test@test.com")
+        public String emailAddress;
     }
 
     @Schema(description = "PostClientsResponse")
@@ -332,6 +343,8 @@ final class ClientsApiResourceSwagger {
         public Long clientId;
         @Schema(example = "2")
         public Integer resourceId;
+        @Schema(example = "123-456")
+        public String resourceExternalId;
     }
 
     @Schema(description = "PutClientsClientIdRequest")
@@ -341,6 +354,8 @@ final class ClientsApiResourceSwagger {
 
         @Schema(example = "786444UUUYYH7")
         public String externalId;
+        @Schema(example = "123-456")
+        public String resourceExternalId;
     }
 
     @Schema(description = "PutClientsClientIdResponse")
@@ -354,6 +369,8 @@ final class ClientsApiResourceSwagger {
         public Integer clientId;
         @Schema(example = "1")
         public Integer resourceId;
+        @Schema(example = "123-456")
+        public String resourceExternalId;
         public PutClientsClientIdRequest changes;
     }
 
@@ -374,6 +391,8 @@ final class ClientsApiResourceSwagger {
         public Integer clientId;
         @Schema(example = "3")
         public Integer resourceId;
+        @Schema(example = "123-456")
+        public String resourceExternalId;
     }
 
     @Schema(description = "PostClientsClientIdRequest")
@@ -400,6 +419,44 @@ final class ClientsApiResourceSwagger {
         public Integer clientId;
         @Schema(example = "2")
         public Integer resourceId;
+        @Schema(example = "123-456")
+        public String resourceExternalId;
+    }
+
+    @Schema(description = "GetClientTransferProposalDateResponse")
+    public static final class GetClientTransferProposalDateResponse {
+
+        @Schema(example = "[2013, 1, 1]")
+        public LocalDate proposedTransferDate;
+    }
+
+    @Schema(description = "GetClientObligeeDetailsResponse")
+    public static final class GetClientObligeeDetailsResponse {
+
+        static final class GetObligeeData {
+
+            private GetObligeeData() {}
+
+            @Schema(example = "John")
+            public String firstName;
+            @Schema(example = "Doe")
+            public String lastName;
+            @Schema(example = "John Doe")
+            public String displayName;
+            @Schema(example = "00000002")
+            public String accountNumber;
+            @Schema(example = "12000.00")
+            public Double loanAmount;
+            @Schema(example = "100.00")
+            public Double guaranteeAmount;
+            @Schema(example = "10000.00")
+            public Double amountReleased;
+            @Schema(example = "1000.00")
+            public Double amountTransferred;
+
+        }
+
+        public Set<GetObligeeData> obligees;
     }
 
     @Schema(description = "GetClientsClientIdAccountsResponse")

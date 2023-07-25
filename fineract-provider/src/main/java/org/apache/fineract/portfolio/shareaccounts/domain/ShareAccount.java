@@ -18,23 +18,22 @@
  */
 package org.apache.fineract.portfolio.shareaccounts.domain;
 
-import java.util.Date;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Embedded;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
-import javax.persistence.Transient;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.infrastructure.security.service.RandomPasswordGenerator;
@@ -50,62 +49,56 @@ import org.apache.fineract.useradministration.domain.AppUser;
 public class ShareAccount extends AbstractPersistableCustom {
 
     @ManyToOne
-    @JoinColumn(name = "client_id", nullable = true)
+    @JoinColumn(name = "client_id")
     private Client client;
 
     @ManyToOne
-    @JoinColumn(name = "product_id", nullable = true)
+    @JoinColumn(name = "product_id")
     private ShareProduct shareProduct;
 
     @Column(name = "status_enum", nullable = false)
     protected Integer status;
 
     @Column(name = "submitted_date")
-    @Temporal(TemporalType.DATE)
-    private Date submittedDate;
+    private LocalDate submittedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "submitted_userid", nullable = true)
+    @JoinColumn(name = "submitted_userid")
     protected AppUser submittedBy;
 
-    @Temporal(TemporalType.DATE)
     @Column(name = "approved_date")
-    protected Date approvedDate;
+    protected LocalDate approvedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "approved_userid", nullable = true)
+    @JoinColumn(name = "approved_userid")
     protected AppUser approvedBy;
 
-    @Temporal(TemporalType.DATE)
     @Column(name = "rejected_date")
-    protected Date rejectedDate;
+    protected LocalDate rejectedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "rejected_userid", nullable = true)
+    @JoinColumn(name = "rejected_userid")
     protected AppUser rejectedBy;
 
-    @Temporal(TemporalType.DATE)
-    @Column(name = "activated_date", nullable = true)
-    protected Date activatedDate;
+    @Column(name = "activated_date")
+    protected LocalDate activatedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "activated_userid", nullable = true)
+    @JoinColumn(name = "activated_userid")
     protected AppUser activatedBy;
 
-    @Temporal(TemporalType.DATE)
     @Column(name = "closed_date")
-    protected Date closedDate;
+    protected LocalDate closedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "closed_userid", nullable = true)
+    @JoinColumn(name = "closed_userid")
     protected AppUser closedBy;
 
-    @Temporal(TemporalType.DATE)
     @Column(name = "lastmodified_date")
-    protected Date modifiedDate;
+    protected LocalDateTime modifiedDate;
 
     @ManyToOne(optional = true)
-    @JoinColumn(name = "lastmodifiedby_id", nullable = true)
+    @JoinColumn(name = "lastmodifiedby_id")
     protected AppUser modifiedBy;
 
     @Column(name = "external_id")
@@ -127,7 +120,7 @@ public class ShareAccount extends AbstractPersistableCustom {
     private Boolean allowDividendCalculationForInactiveClients;
 
     @ManyToOne
-    @JoinColumn(name = "savings_account_id", nullable = true)
+    @JoinColumn(name = "savings_account_id")
     private SavingsAccount savingsAccount;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "shareAccount", orphanRemoval = true, fetch = FetchType.EAGER)
@@ -137,14 +130,14 @@ public class ShareAccount extends AbstractPersistableCustom {
     private Integer lockinPeriodFrequency;
 
     @Enumerated(EnumType.ORDINAL)
-    @Column(name = "lockin_period_frequency_enum", nullable = true)
+    @Column(name = "lockin_period_frequency_enum")
     private PeriodFrequencyType lockinPeriodFrequencyType;
 
     @Column(name = "minimum_active_period_frequency")
     private Integer minimumActivePeriodFrequency;
 
     @Enumerated(EnumType.ORDINAL)
-    @Column(name = "minimum_active_period_frequency_enum", nullable = true)
+    @Column(name = "minimum_active_period_frequency_enum")
     private PeriodFrequencyType minimumActivePeriodFrequencyType;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "shareAccount", orphanRemoval = true, fetch = FetchType.EAGER)
@@ -162,8 +155,9 @@ public class ShareAccount extends AbstractPersistableCustom {
             final Set<ShareAccountTransaction> purchasedShares, final Boolean allowDividendCalculationForInactiveClients,
             final Integer lockinPeriodFrequency, final PeriodFrequencyType lockPeriodType, final Integer minimumActivePeriodFrequency,
             final PeriodFrequencyType minimumActivePeriodType, Set<ShareAccountCharge> charges, AppUser submittedBy,
-            final Date submittedDate, AppUser approvedBy, Date approvedDate, AppUser rejectedBy, Date rejectedDate, AppUser activatedBy,
-            Date activatedDate, AppUser closedBy, Date closedDate, AppUser modifiedBy, Date modifiedDate) {
+            final LocalDate submittedDate, AppUser approvedBy, LocalDate approvedDate, AppUser rejectedBy, LocalDate rejectedDate,
+            AppUser activatedBy, LocalDate activatedDate, AppUser closedBy, LocalDate closedDate, AppUser modifiedBy,
+            LocalDateTime modifiedDate) {
 
         this.client = client;
         this.shareProduct = shareProduct;
@@ -213,7 +207,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         return this.shareProduct;
     }
 
-    public boolean setSubmittedDate(final Date submittedDate) {
+    public boolean setSubmittedDate(final LocalDate submittedDate) {
         boolean toReturn = false;
         if (this.submittedDate.compareTo(submittedDate) == 0 ? Boolean.FALSE : Boolean.TRUE) {
             this.submittedDate = submittedDate;
@@ -222,7 +216,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         return toReturn;
     }
 
-    public boolean setApprovedDate(final Date approvedDate) {
+    public boolean setApprovedDate(final LocalDate approvedDate) {
         boolean toReturn = false;
         if (this.approvedDate.compareTo(approvedDate) == 0 ? Boolean.FALSE : Boolean.TRUE) {
             this.approvedDate = approvedDate;
@@ -397,7 +391,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         this.charges.add(charge);
     }
 
-    public void approve(final Date approvedDate, final AppUser approvedUser) {
+    public void approve(final LocalDate approvedDate, final AppUser approvedUser) {
         this.approvedDate = approvedDate;
         this.approvedBy = approvedUser;
         for (ShareAccountTransaction transaction : this.shareAccountTransactions) {
@@ -408,7 +402,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         this.totalSharesPending = null;
     }
 
-    public void activate(final Date approvedDate, final AppUser approvedUser) {
+    public void activate(final LocalDate approvedDate, final AppUser approvedUser) {
         this.activatedDate = approvedDate;
         this.activatedBy = approvedUser;
         this.status = ShareAccountStatusType.ACTIVE.getValue();
@@ -433,7 +427,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         this.totalSharesPending = tempTotalShares;
     }
 
-    public void reject(final Date rejectedDate, final AppUser rejectedUser) {
+    public void reject(final LocalDate rejectedDate, final AppUser rejectedUser) {
         this.rejectedDate = rejectedDate;
         this.rejectedBy = rejectedUser;
         this.status = ShareAccountStatusType.REJECTED.getValue();
@@ -446,7 +440,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         }
     }
 
-    public void close(final Date closedDate, final AppUser closedBy) {
+    public void close(final LocalDate closedDate, final AppUser closedBy) {
         this.closedDate = closedDate;
         this.closedBy = closedBy;
         this.status = ShareAccountStatusType.CLOSED.getValue();
@@ -532,11 +526,11 @@ public class ShareAccount extends AbstractPersistableCustom {
         return returnTrans;
     }
 
-    public Date getSubmittedDate() {
+    public LocalDate getSubmittedDate() {
         return this.submittedDate;
     }
 
-    public Date getApprovedDate() {
+    public LocalDate getApprovedDate() {
         return this.approvedDate;
     }
 
@@ -566,7 +560,7 @@ public class ShareAccount extends AbstractPersistableCustom {
         return this.lockinPeriodFrequencyType;
     }
 
-    public Date getActivatedDate() {
+    public LocalDate getActivatedDate() {
         return this.activatedDate;
     }
 

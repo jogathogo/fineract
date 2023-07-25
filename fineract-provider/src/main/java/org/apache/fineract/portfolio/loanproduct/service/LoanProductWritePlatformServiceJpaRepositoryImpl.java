@@ -20,12 +20,12 @@ package org.apache.fineract.portfolio.loanproduct.service;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import jakarta.persistence.PersistenceException;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.persistence.PersistenceException;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.fineract.accounting.producttoaccountmapping.service.ProductToGLAccountMappingWritePlatformService;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -34,26 +34,24 @@ import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuild
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.infrastructure.entityaccess.domain.FineractEntityAccessType;
 import org.apache.fineract.infrastructure.entityaccess.service.FineractEntityAccessUtil;
+import org.apache.fineract.infrastructure.event.business.domain.loan.product.LoanProductCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.charge.domain.Charge;
 import org.apache.fineract.portfolio.charge.domain.ChargeRepositoryWrapper;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEntity;
-import org.apache.fineract.portfolio.common.BusinessEventNotificationConstants.BusinessEvents;
-import org.apache.fineract.portfolio.common.service.BusinessEventNotifierService;
+import org.apache.fineract.portfolio.delinquency.domain.DelinquencyBucket;
+import org.apache.fineract.portfolio.delinquency.domain.DelinquencyBucketRepository;
 import org.apache.fineract.portfolio.floatingrates.domain.FloatingRate;
 import org.apache.fineract.portfolio.floatingrates.domain.FloatingRateRepositoryWrapper;
 import org.apache.fineract.portfolio.fund.domain.Fund;
 import org.apache.fineract.portfolio.fund.domain.FundRepository;
 import org.apache.fineract.portfolio.fund.exception.FundNotFoundException;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTransactionProcessorFactory;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionProcessingStrategyRepository;
-import org.apache.fineract.portfolio.loanaccount.exception.LoanTransactionProcessingStrategyNotFoundException;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.AprCalculator;
 import org.apache.fineract.portfolio.loanproduct.LoanProductConstants;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProduct;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductRepository;
-import org.apache.fineract.portfolio.loanproduct.domain.LoanTransactionProcessingStrategy;
 import org.apache.fineract.portfolio.loanproduct.exception.InvalidCurrencyException;
 import org.apache.fineract.portfolio.loanproduct.exception.LoanProductCannotBeModifiedDueToNonClosedLoansException;
 import org.apache.fineract.portfolio.loanproduct.exception.LoanProductDateException;
@@ -63,13 +61,13 @@ import org.apache.fineract.portfolio.rate.domain.Rate;
 import org.apache.fineract.portfolio.rate.domain.RateRepositoryWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanProductWritePlatformService {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanProductWritePlatformServiceJpaRepositoryImpl.class);
@@ -78,7 +76,6 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
     private final LoanProductRepository loanProductRepository;
     private final AprCalculator aprCalculator;
     private final FundRepository fundRepository;
-    private final LoanTransactionProcessingStrategyRepository loanTransactionProcessingStrategyRepository;
     private final ChargeRepositoryWrapper chargeRepository;
     private final RateRepositoryWrapper rateRepository;
     private final ProductToGLAccountMappingWritePlatformService accountMappingWritePlatformService;
@@ -86,30 +83,8 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
     private final FloatingRateRepositoryWrapper floatingRateRepository;
     private final LoanRepositoryWrapper loanRepositoryWrapper;
     private final BusinessEventNotifierService businessEventNotifierService;
-
-    @Autowired
-    public LoanProductWritePlatformServiceJpaRepositoryImpl(final PlatformSecurityContext context,
-            final LoanProductDataValidator fromApiJsonDeserializer, final LoanProductRepository loanProductRepository,
-            final AprCalculator aprCalculator, final FundRepository fundRepository,
-            final LoanTransactionProcessingStrategyRepository loanTransactionProcessingStrategyRepository,
-            final ChargeRepositoryWrapper chargeRepository, final RateRepositoryWrapper rateRepository,
-            final ProductToGLAccountMappingWritePlatformService accountMappingWritePlatformService,
-            final FineractEntityAccessUtil fineractEntityAccessUtil, final FloatingRateRepositoryWrapper floatingRateRepository,
-            final LoanRepositoryWrapper loanRepositoryWrapper, final BusinessEventNotifierService businessEventNotifierService) {
-        this.context = context;
-        this.fromApiJsonDeserializer = fromApiJsonDeserializer;
-        this.loanProductRepository = loanProductRepository;
-        this.aprCalculator = aprCalculator;
-        this.fundRepository = fundRepository;
-        this.loanTransactionProcessingStrategyRepository = loanTransactionProcessingStrategyRepository;
-        this.chargeRepository = chargeRepository;
-        this.rateRepository = rateRepository;
-        this.accountMappingWritePlatformService = accountMappingWritePlatformService;
-        this.fineractEntityAccessUtil = fineractEntityAccessUtil;
-        this.floatingRateRepository = floatingRateRepository;
-        this.loanRepositoryWrapper = loanRepositoryWrapper;
-        this.businessEventNotifierService = businessEventNotifierService;
-    }
+    private final DelinquencyBucketRepository delinquencyBucketRepository;
+    private final LoanRepaymentScheduleTransactionProcessorFactory loanRepaymentScheduleTransactionProcessorFactory;
 
     @Transactional
     @Override
@@ -124,9 +99,7 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
 
             final Fund fund = findFundByIdIfProvided(command.longValueOfParameterNamed("fundId"));
 
-            final Long transactionProcessingStrategyId = command.longValueOfParameterNamed("transactionProcessingStrategyId");
-            final LoanTransactionProcessingStrategy loanTransactionProcessingStrategy = findStrategyByIdIfProvided(
-                    transactionProcessingStrategyId);
+            final String loanTransactionProcessingStrategyCode = command.stringValueOfParameterNamed("transactionProcessingStrategyCode");
 
             final String currencyCode = command.stringValueOfParameterNamed("currencyCode");
             final List<Charge> charges = assembleListOfProductCharges(command, currencyCode);
@@ -137,29 +110,33 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
                 floatingRate = this.floatingRateRepository
                         .findOneWithNotFoundDetection(command.longValueOfParameterNamed("floatingRatesId"));
             }
-            final LoanProduct loanproduct = LoanProduct.assembleFromJson(fund, loanTransactionProcessingStrategy, charges, command,
+            final LoanProduct loanProduct = LoanProduct.assembleFromJson(fund, loanTransactionProcessingStrategyCode, charges, command,
                     this.aprCalculator, floatingRate, rates);
-            loanproduct.updateLoanProductInRelatedClasses();
+            loanProduct.updateLoanProductInRelatedClasses();
+            loanProduct.setTransactionProcessingStrategyName(
+                    loanRepaymentScheduleTransactionProcessorFactory.determineProcessor(loanTransactionProcessingStrategyCode).getName());
 
-            this.loanProductRepository.saveAndFlush(loanproduct);
+            if (command.parameterExists("delinquencyBucketId")) {
+                DelinquencyBucket delinquencyBucket = this.delinquencyBucketRepository
+                        .getReferenceById(command.longValueOfParameterNamed("delinquencyBucketId"));
+                loanProduct.setDelinquencyBucket(delinquencyBucket);
+            }
+
+            this.loanProductRepository.saveAndFlush(loanProduct);
 
             // save accounting mappings
-            this.accountMappingWritePlatformService.createLoanProductToGLAccountMapping(loanproduct.getId(), command);
+            this.accountMappingWritePlatformService.createLoanProductToGLAccountMapping(loanProduct.getId(), command);
             // check if the office specific products are enabled. If yes, then
             // save this savings product against a specific office
             // i.e. this savings product is specific for this office.
             fineractEntityAccessUtil.checkConfigurationAndAddProductResrictionsForUserOffice(
-                    FineractEntityAccessType.OFFICE_ACCESS_TO_LOAN_PRODUCTS, loanproduct.getId());
+                    FineractEntityAccessType.OFFICE_ACCESS_TO_LOAN_PRODUCTS, loanProduct.getId());
 
-            this.businessEventNotifierService.notifyBusinessEventWasExecuted(BusinessEvents.LOAN_PRODUCT_CREATE,
-                    constructEntityMap(BusinessEntity.LOAN_PRODUCT, loanproduct));
-
-            this.businessEventNotifierService.notifyBusinessEventWasExecuted(BusinessEvents.LOAN_PRODUCT_CREATE,
-                    constructEntityMap(BusinessEntity.LOAN_PRODUCT, loanproduct));
+            businessEventNotifierService.notifyPostBusinessEvent(new LoanProductCreateBusinessEvent(loanProduct));
 
             return new CommandProcessingResultBuilder() //
                     .withCommandId(command.commandId()) //
-                    .withEntityId(loanproduct.getId()) //
+                    .withEntityId(loanProduct.getId()) //
                     .build();
 
         } catch (final JpaSystemException | DataIntegrityViolationException dve) {
@@ -171,15 +148,6 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
             return CommandProcessingResult.empty();
         }
 
-    }
-
-    private LoanTransactionProcessingStrategy findStrategyByIdIfProvided(final Long transactionProcessingStrategyId) {
-        LoanTransactionProcessingStrategy strategy = null;
-        if (transactionProcessingStrategyId != null) {
-            return this.loanTransactionProcessingStrategyRepository.findById(transactionProcessingStrategyId)
-                    .orElseThrow(() -> new LoanTransactionProcessingStrategyNotFoundException(transactionProcessingStrategyId));
-        }
-        return strategy;
     }
 
     private Fund findFundByIdIfProvided(final Long fundId) {
@@ -222,11 +190,18 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
                 product.update(fund);
             }
 
-            if (changes.containsKey("transactionProcessingStrategyId")) {
-                final Long transactionProcessingStrategyId = (Long) changes.get("transactionProcessingStrategyId");
-                final LoanTransactionProcessingStrategy loanTransactionProcessingStrategy = findStrategyByIdIfProvided(
-                        transactionProcessingStrategyId);
-                product.update(loanTransactionProcessingStrategy);
+            if (changes.containsKey("delinquencyBucketId")) {
+                final Long delinquencyBucketId = (Long) changes.get("delinquencyBucketId");
+                final DelinquencyBucket delinquencyBucket = this.delinquencyBucketRepository.getReferenceById(delinquencyBucketId);
+                product.setDelinquencyBucket(delinquencyBucket);
+            }
+
+            if (changes.containsKey("transactionProcessingStrategyCode")) {
+                final String transactionProcessingStrategyCode = (String) changes.get("transactionProcessingStrategyCode");
+                final String transactionProcessingStrategyName = loanRepaymentScheduleTransactionProcessorFactory
+                        .determineProcessor(transactionProcessingStrategyCode).getName();
+                product.setTransactionProcessingStrategyCode(transactionProcessingStrategyCode);
+                product.setTransactionProcessingStrategyName(transactionProcessingStrategyName);
             }
 
             if (changes.containsKey("charges")) {
@@ -264,7 +239,7 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
 
         } catch (final DataIntegrityViolationException | JpaSystemException dve) {
             handleDataIntegrityIssues(command, dve.getMostSpecificCause(), dve);
-            return new CommandProcessingResult(Long.valueOf(-1));
+            return new CommandProcessingResult((long) -1);
         } catch (final PersistenceException dve) {
             Throwable throwable = ExceptionUtils.getRootCause(dve.getCause());
             handleDataIntegrityIssues(command, throwable, dve);
@@ -380,13 +355,6 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
     }
 
     private void logAsErrorUnexpectedDataIntegrityException(final Exception dve) {
-        LOG.error("Error occured.", dve);
-    }
-
-    private Map<BusinessEventNotificationConstants.BusinessEntity, Object> constructEntityMap(
-            final BusinessEventNotificationConstants.BusinessEntity entityEvent, Object entity) {
-        Map<BusinessEventNotificationConstants.BusinessEntity, Object> map = new HashMap<>(1);
-        map.put(entityEvent, entity);
-        return map;
+        LOG.error("Error occurred.", dve);
     }
 }

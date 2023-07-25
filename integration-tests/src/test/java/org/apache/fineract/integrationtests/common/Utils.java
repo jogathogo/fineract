@@ -23,8 +23,13 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.restassured.RestAssured;
+import io.restassured.builder.RequestSpecBuilder;
+import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
@@ -36,12 +41,26 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.http.conn.HttpHostConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,27 +72,45 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("unchecked")
 public final class Utils {
 
-    private Utils() {
-
-    }
-
-    private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
-    private static final SecureRandom random = new SecureRandom();
-
     public static final String TENANT_PARAM_NAME = "tenantIdentifier";
     public static final String DEFAULT_TENANT = "default";
     public static final String TENANT_IDENTIFIER = TENANT_PARAM_NAME + '=' + DEFAULT_TENANT;
-
-    public static final String TENANT_TIME_ZONE = "Asia/Kolkata";
-
-    private static final String HEALTH_URL = "/fineract-provider/actuator/health";
     private static final String LOGIN_URL = "/fineract-provider/api/v1/authentication?" + TENANT_IDENTIFIER;
+    public static final String TENANT_TIME_ZONE = "Asia/Kolkata";
+    public static final String DATE_FORMAT = "dd MMMM yyyy";
+    public static final String DATE_TIME_FORMAT = "dd MMMM yyyy HH:mm";
+    public static final DateTimeFormatter dateFormatter = new DateTimeFormatterBuilder().appendPattern(DATE_FORMAT).toFormatter();
+    public static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder().appendPattern(DATE_TIME_FORMAT).toFormatter();
+    private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
+    private static final SecureRandom random = new SecureRandom();
+    private static final Gson gson = new Gson();
+    private static final String HEALTH_URL = "/fineract-provider/actuator/health";
+
+    private static final Random r = new Random();
+
+    private static final ConcurrentHashMap<String, Set<String>> uniqueRandomStringContainer = new ConcurrentHashMap<>();
+    public static final String SOURCE_SET_NUMBERS_AND_LETTERS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    public static final String SOURCE_SET_NUMBERS = "1234567890";
+
+    private Utils() {
+
+    }
 
     public static void initializeRESTAssured() {
         RestAssured.baseURI = "https://localhost";
         RestAssured.port = 8443;
         RestAssured.keyStore("src/main/resources/keystore.jks", "openmf");
         RestAssured.useRelaxedHTTPSValidation();
+    }
+
+    public static RequestSpecification initializeDefaultRequestSpecification() {
+        RequestSpecification requestSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
+        requestSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey());
+        return requestSpec;
+    }
+
+    public static ResponseSpecification initializeDefaultResponseSpecification() {
+        return new ResponseSpecBuilder().expectStatusCode(200).build();
     }
 
     private static void awaitSpringBootActuatorHealthyUp() {
@@ -108,6 +145,23 @@ public final class Utils {
         }
     }
 
+    /**
+     * Wait until the given condition is true or the maxRun is reached.
+     *
+     * @param maxRun
+     *            max number of times to run the condition
+     * @param seconds
+     *            wait time between evaluation in seconds
+     * @param waitCondition
+     *            condition to evaluate
+     */
+    public static void conditionalSleepWithMaxWait(int maxRun, int seconds, Supplier<Boolean> waitCondition) {
+        do {
+            sleep(seconds);
+            maxRun--;
+        } while (maxRun > 0 && waitCondition.get());
+    }
+
     private static void sleep(int seconds) {
         try {
             Thread.sleep(seconds * 1000);
@@ -118,12 +172,17 @@ public final class Utils {
     }
 
     public static String loginIntoServerAndGetBase64EncodedAuthenticationKey() {
+        return loginIntoServerAndGetBase64EncodedAuthenticationKey("mifos", "password");
+    }
+
+    public static String loginIntoServerAndGetBase64EncodedAuthenticationKey(String username, String password) {
         awaitSpringBootActuatorHealthyUp();
         try {
             LOG.info("Logging in, for integration test...");
             // system.out.println("-----------------------------------LOGIN-----------------------------------------");
-            String json = RestAssured.given().contentType(ContentType.JSON).body("{\"username\":\"mifos\", \"password\":\"password\"}")
-                    .expect().log().ifError().when().post(LOGIN_URL).asString();
+            String json = RestAssured.given().contentType(ContentType.JSON)
+                    .body("{\"username\":\"" + username + "\", \"password\":\"" + password + "\"}").expect().log().ifError().when()
+                    .post(LOGIN_URL).asString();
             assertThat("Failed to login into fineract platform", StringUtils.isBlank(json), is(false));
             String key = JsonPath.with(json).get("base64EncodedAuthenticationKey");
             assertThat("Failed to obtain key: " + json, StringUtils.isBlank(key), is(false));
@@ -143,6 +202,11 @@ public final class Utils {
         return performServerGet(requestSpec, responseSpec, url, null);
     }
 
+    public static Response performServerGetRaw(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final String getURL, Function<RequestSpecification, RequestSpecification> requestMapper) {
+        return requestMapper.apply(given().spec(requestSpec)).expect().spec(responseSpec).log().ifError().when().get(getURL).andReturn();
+    }
+
     public static <T> T performServerGet(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final String getURL, final String jsonAttributeToGetBack) {
         final String json = given().spec(requestSpec).expect().spec(responseSpec).log().ifError().when().get(getURL).andReturn().asString();
@@ -150,6 +214,20 @@ public final class Utils {
             return (T) json;
         }
         return (T) JsonPath.from(json).get(jsonAttributeToGetBack);
+    }
+
+    public static List<String> performServerGetList(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final String getURL, final String jsonAttributeToGetBack) {
+        final JsonPath jsonPath = given().spec(requestSpec).expect().spec(responseSpec).log().ifError().when().get(getURL).jsonPath();
+        List<String> items = jsonPath.getList(jsonAttributeToGetBack);
+        return items;
+    }
+
+    public static JsonElement performServerGetArray(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final String getURL, final int position, final String jsonAttributeToGetBack) {
+        final JsonPath jsonPath = given().spec(requestSpec).expect().spec(responseSpec).log().ifError().when().get(getURL).jsonPath();
+        List<Map<String, Object>> items = jsonPath.getList("$");
+        return gson.fromJson(((ArrayList) items.get(position).get(jsonAttributeToGetBack)).toString(), JsonArray.class);
     }
 
     public static String performGetTextResponse(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
@@ -169,6 +247,7 @@ public final class Utils {
 
     public static <T> T performServerPost(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final String postURL, final String jsonBodyToSend, final String jsonAttributeToGetBack) {
+        LOG.info("JSON {}", jsonBodyToSend);
         final String json = given().spec(requestSpec).body(jsonBodyToSend).expect().spec(responseSpec).log().ifError().when().post(postURL)
                 .andReturn().asString();
         if (jsonAttributeToGetBack == null) {
@@ -177,10 +256,23 @@ public final class Utils {
         return (T) JsonPath.from(json).get(jsonAttributeToGetBack);
     }
 
+    public static Response performServerPutRaw(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final String putURL, Function<RequestSpecification, RequestSpecification> bodyMapper) {
+        return bodyMapper.apply(given().spec(requestSpec)).expect().spec(responseSpec).log().ifError().when().put(putURL).andReturn();
+    }
+
+    public static String performServerPut(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final String putURL, final String jsonBodyToSend) {
+        return performServerPut(requestSpec, responseSpec, putURL, jsonBodyToSend, null);
+    }
+
     public static <T> T performServerPut(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final String putURL, final String jsonBodyToSend, final String jsonAttributeToGetBack) {
         final String json = given().spec(requestSpec).body(jsonBodyToSend).expect().spec(responseSpec).log().ifError().when().put(putURL)
                 .andReturn().asString();
+        if (jsonAttributeToGetBack == null) {
+            return (T) json;
+        }
         return (T) JsonPath.from(json).get(jsonAttributeToGetBack);
     }
 
@@ -216,28 +308,58 @@ public final class Utils {
         for (int i = 0; i < len; i++) {
             sb.append(sourceSetString.charAt(random.nextInt(lengthOfSource)));
         }
-        return prefix + sb.toString();
+        return prefix + sb;
     }
 
     public static String randomStringGenerator(final String prefix, final int len) {
-        return randomStringGenerator(prefix, len, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        return randomStringGenerator(prefix, len, SOURCE_SET_NUMBERS_AND_LETTERS);
     }
 
-    public static String randomNameGenerator(final String prefix, final int lenOfRandomSuffix) {
-        return randomStringGenerator(prefix, lenOfRandomSuffix);
+    public static String uniqueRandomStringGenerator(final String prefix, final int lenOfRandomSuffix) {
+        return uniqueRandomGenerator(prefix, lenOfRandomSuffix, SOURCE_SET_NUMBERS_AND_LETTERS);
+    }
+
+    public static Integer uniqueRandomNumberGenerator(final int lenOfRandomSuffix) {
+        return Integer.parseInt(uniqueRandomGenerator("", lenOfRandomSuffix, SOURCE_SET_NUMBERS));
+    }
+
+    public static String uniqueRandomGenerator(final String prefix, final int lenOfRandomSuffix, String sourceSet) {
+        String response;
+        String key = prefix + lenOfRandomSuffix;
+        int i = 0;
+        do {
+            response = randomStringGenerator(prefix, lenOfRandomSuffix, sourceSet);
+            uniqueRandomStringContainer.putIfAbsent(key, new HashSet<>());
+            i++;
+
+            if (i == 10000) {
+                throw new IllegalStateException("Possible endless loop for: " + key);
+            }
+        } while (!uniqueRandomStringContainer.get(key).add(response));
+
+        return response;
     }
 
     @SuppressFBWarnings(value = {
             "DMI_RANDOM_USED_ONLY_ONCE" }, justification = "False positive for random object created and used only once")
-    public static Long randomNumberGenerator(final int expectedLength) {
-        final String source = "1234567890";
-        final int lengthofSource = source.length();
+    public static Integer randomNumberGenerator(final int expectedLength) {
+        String response = randomStringGenerator("", expectedLength, SOURCE_SET_NUMBERS);
+        return Integer.parseInt(response);
+    }
 
-        StringBuilder stringBuilder = new StringBuilder(expectedLength);
-        for (int i = 0; i < expectedLength; i++) {
-            stringBuilder.append(source.charAt(random.nextInt(lengthofSource)));
+    public static Float randomDecimalGenerator(final int expectedWholeLength, final int expectedFractionLength) {
+        final String source = SOURCE_SET_NUMBERS;
+        final int lengthOfSource = source.length();
+
+        StringBuilder stringBuilder = new StringBuilder(expectedWholeLength + expectedFractionLength + 1);
+        for (int i = 0; i < expectedWholeLength; i++) {
+            stringBuilder.append(source.charAt(random.nextInt(lengthOfSource)));
         }
-        return Long.parseLong(stringBuilder.toString());
+        stringBuilder.append(".");
+        for (int i = 0; i < expectedFractionLength; i++) {
+            stringBuilder.append(source.charAt(random.nextInt(lengthOfSource)));
+        }
+        return Float.parseFloat(stringBuilder.toString());
     }
 
     public static String convertDateToURLFormat(final Calendar dateToBeConvert) {
@@ -246,17 +368,40 @@ public final class Utils {
         return dateFormat.format(dateToBeConvert.getTime());
     }
 
-    public static LocalDate getLocalDateOfTenant() {
-        LocalDate today = LocalDate.now(DateUtils.getDateTimeZoneOfTenant());
-        final ZoneId zone = ZoneId.of(TENANT_TIME_ZONE);
-        if (zone != null) {
-            today = LocalDate.now(zone);
-        }
-        return today;
+    public static String convertDateToURLFormat(final Calendar dateToBeConvert, final String dateGormat) {
+        DateFormat dateFormat = new SimpleDateFormat(dateGormat);
+        dateFormat.setTimeZone(Utils.getTimeZoneOfTenant());
+        return dateFormat.format(dateToBeConvert.getTime());
     }
 
     public static TimeZone getTimeZoneOfTenant() {
         return TimeZone.getTimeZone(TENANT_TIME_ZONE);
+    }
+
+    public static ZoneId getZoneIdOfTenant() {
+        return ZoneId.of(TENANT_TIME_ZONE);
+    }
+
+    public static LocalDate getLocalDateOfTenant() {
+        return LocalDate.now(getZoneIdOfTenant());
+    }
+
+    public static Date convertJsonElementAsDate(JsonElement jsonElement) {
+        if (jsonElement.isJsonArray()) {
+            JsonArray jsonArray = jsonElement.getAsJsonArray();
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(Calendar.YEAR, jsonArray.get(0).getAsInt());
+            calendar.set(Calendar.MONTH, jsonArray.get(1).getAsInt() - 1);
+            calendar.set(Calendar.DATE, jsonArray.get(2).getAsInt());
+            // If the Array includes Time
+            if (jsonArray.size() > 3) {
+                calendar.set(Calendar.HOUR, jsonArray.get(3).getAsInt());
+                calendar.set(Calendar.MINUTE, jsonArray.get(4).getAsInt());
+                calendar.set(Calendar.SECOND, jsonArray.get(5).getAsInt());
+            }
+            return calendar.getTime();
+        }
+        return null;
     }
 
     public static String performServerTemplatePost(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
@@ -273,5 +418,80 @@ public final class Utils {
         final String templateLocation = given().spec(requestSpec).queryParam("importDocumentId", importDocumentId).expect()
                 .spec(responseSpec).log().ifError().when().get(getURL).andReturn().asString();
         return templateLocation.substring(1, templateLocation.length() - 1);
+    }
+
+    public static String emptyJson() {
+        return "{}";
+    }
+
+    public static String randomDateGenerator(String dateFormat) {
+        DateTimeFormatter dateTimeFormatterBuilder = new DateTimeFormatterBuilder().parseCaseInsensitive().parseLenient()
+                .appendPattern(dateFormat).optionalStart().appendPattern(" HH:mm:ss").optionalEnd()
+                .parseDefaulting(ChronoField.HOUR_OF_DAY, 0).parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+                .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0).toFormatter();
+        LocalDate localDate = LocalDate.of(getYear(), getMonth(), getDay());
+        return dateTimeFormatterBuilder.format(localDate);
+    }
+
+    public static String randomDateTimeGenerator(String dateFormat) {
+        DateTimeFormatter dateTimeFormatterBuilder = new DateTimeFormatterBuilder().parseCaseInsensitive().parseLenient()
+                .appendPattern(dateFormat).optionalStart().appendPattern(" HH:mm:ss").optionalEnd()
+                .parseDefaulting(ChronoField.HOUR_OF_DAY, 0).parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+                .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0).toFormatter();
+        LocalDateTime localDate = LocalDateTime.of(getYear(), getMonth(), getDay(), getHour(), getMinute(), getSecond());
+        return dateTimeFormatterBuilder.format(localDate);
+    }
+
+    private static int getYear() {
+        return 1000 + r.nextInt(1001);
+    }
+
+    private static int getMonth() {
+        return 10 + r.nextInt(3);
+    }
+
+    private static int getDay() {
+        return 10 + r.nextInt(16);
+    }
+
+    private static int getHour() {
+        return 10 + r.nextInt(14);
+    }
+
+    private static int getMinute() {
+        return 10 + r.nextInt(50);
+    }
+
+    private static int getSecond() {
+        return 10 + r.nextInt(50);
+    }
+
+    public static String arrayDateToString(List intArray) {
+        String[] strArray = (String[]) intArray.stream().map(String::valueOf).toArray(String[]::new);
+        return String.join("-", strArray);
+    }
+
+    public static String arrayDateTimeToString(List<Integer> integerList) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            if (i < 2) {
+                stringBuilder.append(integerList.get(i)).append("-");
+            } else if (i == 2) {
+                stringBuilder.append(integerList.get(i)).append(" ");
+            } else if (i == 3) {
+                stringBuilder.append(integerList.get(i));
+            } else {
+                stringBuilder.append(":").append(integerList.get(i));
+            }
+        }
+        return stringBuilder.toString();
+    }
+
+    public static String convertToJson(HashMap<String, Object> map) {
+        return new Gson().toJson(map);
+    }
+
+    public static LocalDate getDateAsLocalDate(String dateAsString) {
+        return LocalDate.parse(dateAsString, dateFormatter);
     }
 }

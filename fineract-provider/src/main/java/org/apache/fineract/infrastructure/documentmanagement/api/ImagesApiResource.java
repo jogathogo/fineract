@@ -21,21 +21,23 @@ package org.apache.fineract.infrastructure.documentmanagement.api;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.data.UploadRequest;
@@ -54,14 +56,12 @@ import org.apache.fineract.portfolio.client.data.ClientData;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
-@Scope("singleton")
-@Path("{entity}/{entityId}/images")
-
+@Path("/v1/{entity}/{entityId}/images")
 public class ImagesApiResource {
 
     private final PlatformSecurityContext context;
@@ -70,18 +70,6 @@ public class ImagesApiResource {
     private final DefaultToApiJsonSerializer<ClientData> toApiJsonSerializer;
     private final FileUploadValidator fileUploadValidator;
     private final ImageResizer imageResizer;
-
-    @Autowired
-    public ImagesApiResource(final PlatformSecurityContext context, final ImageReadPlatformService readPlatformService,
-            final ImageWritePlatformService imageWritePlatformService, final DefaultToApiJsonSerializer<ClientData> toApiJsonSerializer,
-            final FileUploadValidator fileUploadValidator, final ImageResizer imageResizer) {
-        this.context = context;
-        this.imageReadPlatformService = readPlatformService;
-        this.imageWritePlatformService = imageWritePlatformService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.fileUploadValidator = fileUploadValidator;
-        this.imageResizer = imageResizer;
-    }
 
     /**
      * Upload images through multi-part form upload
@@ -165,8 +153,14 @@ public class ImagesApiResource {
 
         try {
             byte[] resizedImageBytes = resizedImage.getByteSource().read();
-            final String clientImageAsBase64Text = imageDataURISuffix + Base64.getMimeEncoder().encodeToString(resizedImageBytes);
-            return Response.ok(clientImageAsBase64Text, MediaType.TEXT_PLAIN_TYPE).build();
+            if (resizedImageBytes != null) {
+                final String clientImageAsBase64Text = imageDataURISuffix + Base64.getMimeEncoder().encodeToString(resizedImageBytes);
+                return Response.ok(clientImageAsBase64Text, MediaType.TEXT_PLAIN_TYPE).build();
+            } else {
+                log.error("resizedImageBytes is null for entityName={}, entityId={}, maxWidth={}, maxHeight={}", entityName, entityId,
+                        maxWidth, maxHeight);
+                return Response.serverError().build();
+            }
         } catch (IOException e) {
             throw new ContentManagementException(imageData.name(), e.getMessage(), e);
         }

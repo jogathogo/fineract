@@ -18,21 +18,29 @@
  */
 package org.apache.fineract.organisation.teller.domain;
 
-import java.util.Date;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDate;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.organisation.office.domain.Office;
 import org.apache.fineract.portfolio.client.domain.Client;
 
 @Entity
 @Table(name = "m_teller_transactions")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Accessors(chain = true)
 public class TellerTransaction extends AbstractPersistableCustom {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -57,67 +65,7 @@ public class TellerTransaction extends AbstractPersistableCustom {
     @Column(name = "amount", nullable = false)
     private Double amount;
 
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "posting_date", nullable = false)
-    private Date postingDate;
+    private LocalDate postingDate;
 
-    public TellerTransaction() {
-
-    }
-
-    public Office getOffice() {
-        return office;
-    }
-
-    public void setOffice(Office office) {
-        this.office = office;
-    }
-
-    public Teller getTeller() {
-        return teller;
-    }
-
-    public void setTeller(Teller teller) {
-        this.teller = teller;
-    }
-
-    public Cashier getCashier() {
-        return cashier;
-    }
-
-    public void setCashier(Cashier cashier) {
-        this.cashier = cashier;
-    }
-
-    public Client getClient() {
-        return client;
-    }
-
-    public void setClient(Client client) {
-        this.client = client;
-    }
-
-    public Integer getType() {
-        return type;
-    }
-
-    public void setType(Integer type) {
-        this.type = type;
-    }
-
-    public Double getAmount() {
-        return amount;
-    }
-
-    public void setAmount(Double amount) {
-        this.amount = amount;
-    }
-
-    public Date getPostingDate() {
-        return postingDate;
-    }
-
-    public void setPostingDate(Date postingDate) {
-        this.postingDate = postingDate;
-    }
 }

@@ -25,7 +25,10 @@ apply plugin: 'org.springframework.boot'
 apply plugin: 'com.gorylenko.gradle-git-properties'
 apply plugin: 'io.swagger.core.v3.swagger-gradle-plugin'
 apply plugin: 'com.google.cloud.tools.jib'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'se.thinkcode.cucumber-runner'
 
+check.dependsOn('cucumber')
 
 compileJava.doLast {
     def mainSS = sourceSets.main
@@ -38,8 +41,8 @@ compileJava.doLast {
         description = 'Performs EclipseLink static weaving of entity classes'
         def target = source
         main 'org.eclipse.persistence.tools.weaving.jpa.StaticWeave'
-        args '-persistenceinfo', source, '-classpath', configurations.runtimeClasspath, source, target
-        classpath configurations.runtimeClasspath
+        args '-persistenceinfo', source, source, target
+        classpath sourceSets.main.runtimeClasspath
     }
     delete {
         delete "${source}/META-INF/persistence.xml"
@@ -64,11 +67,12 @@ task prepareInputYaml {
 }
 
 resolve {
-    logging.captureStandardOutput LogLevel.QUIET
+    logging.captureStandardOutput LogLevel.INFO
     outputFileName = 'fineract'
     outputFormat = 'JSONANDYAML'
     prettyPrint = false
     classpath = sourceSets.main.runtimeClasspath
+    buildClasspath = classpath
     outputDir = file("${buildDir}/classes/java/main/static")
     openApiFile = file("${buildDir}/tmp/swagger/fineract-input.yaml")
     sortOutput = true
@@ -110,21 +114,19 @@ modernizer {
 
 // If we are running Gradle within Eclipse to enhance classes with OpenJPA,
 // set the classes directory to point to Eclipse's default build directory
-if (project.hasProperty('env') && project.getProperty('env') == 'eclipse')
-{
+if (project.hasProperty('env') && project.getProperty('env') == 'eclipse') {
     sourceSets.main.java.outputDir = new File(rootProject.projectDir, "fineract-provider/bin/main")
 }
 
-eclipse
-{
+eclipse {
     project {
         buildCommand([ LaunchConfigHandle: "<project>/.externalToolBuilders/OpenJPA Enhance Builder.launch" ],  'org.eclipse.ui.externaltools.ExternalToolBuilder')
     }
 }
 
 /* http://stackoverflow.com/questions/19653311/jpa-repository-works-in-idea-and-production-but-not-in-gradle */
-sourceSets.main.output.resourcesDir = sourceSets.main.java.outputDir
-sourceSets.test.output.resourcesDir = sourceSets.test.java.outputDir
+sourceSets.main.output.resourcesDir = sourceSets.main.java.classesDirectory
+sourceSets.test.output.resourcesDir = sourceSets.test.java.classesDirectory
 
 if (!(project.hasProperty('env') && project.getProperty('env') == 'dev')) {
     sourceSets {
@@ -149,9 +151,9 @@ configurations {
     driver
 }
 dependencies {
-    driver 'org.mariadb.jdbc:mariadb-java-client:2.7.5'
-    driver 'org.postgresql:postgresql:42.3.5'
-    driver 'mysql:mysql-connector-java:8.0.29'
+    driver 'org.mariadb.jdbc:mariadb-java-client'
+    driver 'org.postgresql:postgresql'
+    driver 'mysql:mysql-connector-java:8.0.32'
 }
 
 URLClassLoader loader = GroovyObject.class.classLoader
@@ -163,7 +165,7 @@ task createDB {
     description= "Creates the MariaDB Database. Needs database name to be passed (like: -PdbName=someDBname)"
     doLast {
         def sql = Sql.newInstance( 'jdbc:mariadb://localhost:3306/', mysqlUser, mysqlPassword, 'org.mariadb.jdbc.Driver' )
-        sql.execute( 'create database '+"`$dbName`" )
+        sql.execute( 'CREATE DATABASE '+"`$dbName` CHARACTER SET utf8mb4" )
     }
 }
 
@@ -195,7 +197,7 @@ task createMySQLDB {
     description= "Creates the MySQL Database. Needs database name to be passed (like: -PdbName=someDBname)"
     doLast {
         def sql = Sql.newInstance( 'jdbc:mysql://localhost:3306/', mysqlUser, mysqlPassword, 'com.mysql.cj.jdbc.Driver' )
-        sql.execute( 'create database '+"`$dbName`" )
+        sql.execute( 'CREATE DATABASE '+"`$dbName` CHARACTER SET utf8mb4" )
     }
 }
 
@@ -221,8 +223,8 @@ bootRun {
     ]
 
     dependencies {
-        implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.5'
-        implementation 'org.postgresql:postgresql:42.3.5'
+        implementation 'org.mariadb.jdbc:mariadb-java-client'
+        implementation 'org.postgresql:postgresql'
     }
 }
 
@@ -235,7 +237,7 @@ bootJar {
     manifest {
         attributes('Main-Class': 'org.springframework.boot.loader.PropertiesLauncher', 'Implementation-Title': 'Apache Fineract', 'Implementation-Version': project.version)
     }
-    classifier = ''
+    archiveClassifier = ''
     dependsOn resolve
 }
 
@@ -255,8 +257,8 @@ jib {
     container {
         creationTime = 'USE_CURRENT_TIMESTAMP'
         mainClass = 'org.apache.fineract.ServerApplication'
+        extraClasspath = ['/app/plugins/*']
         jvmFlags = [
-            '-Xmx1G',
             '-Xms1G',
             '-XshowSettings:vm',
             '-XX:+UseContainerSupport',
@@ -286,8 +288,8 @@ jib {
     allowInsecureRegistries = true
 
     dependencies {
-        implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.5'
-        implementation 'org.postgresql:postgresql:42.3.5'
+        implementation 'org.mariadb.jdbc:mariadb-java-client'
+        implementation 'org.postgresql:postgresql'
     }
 
     pluginExtensions {
@@ -306,10 +308,17 @@ jib {
 
 task migrateDatabase {
     doFirst {
+<<<<<<< HEAD
         println "Executing liquibase database migration to version $dbVersion"
 
         def dbUrl = "jdbc:$dbType://$dbHost$dbPort/$dbName"
         def changeLogFilePath = "fineract-provider/src/main/resources/db/changelog/tenant/upgrades/0000_upgrade_to_$dbVersion.xml"
+=======
+        println 'Executing liquibase database migration to version '+"$dbVersion"
+
+        def dbUrl='jdbc:'+"$dbType"+'://'+"$dbHost"+':'+"$dbPort"+'/'+"$dbName"
+        def changeLogFilePath='fineract-provider/src/main/resources/db/changelog/tenant/upgrades/0000_upgrade_to_'+"$dbVersion"+'.xml'
+>>>>>>> develop
 
         liquibase {
             activities {
@@ -324,6 +333,15 @@ task migrateDatabase {
     }
 }
 
+<<<<<<< HEAD
+=======
+cucumber {
+    tags = 'not @ignore'
+    main = 'io.cucumber.core.cli.Main'
+    shorten = 'argfile'
+}
+
+>>>>>>> develop
 tasks.jibDockerBuild.dependsOn(bootJar)
 
 // Configuration for git properties gradle plugin
@@ -345,5 +363,5 @@ checkstyleMain.dependsOn resolve
 checkstyleTest.dependsOn resolve
 rat.dependsOn prepareInputYaml
 spotbugsTest.dependsOn resolve
-compileTestJava.dependsOn ':fineract-client:processResources'
-bootJarMainClassName.dependsOn resolve
+compileTestJava.dependsOn ':fineract-client:processResources', ':fineract-avro-schemas:processResources'
+resolveMainClassName.dependsOn resolve

@@ -18,16 +18,14 @@
  */
 package org.apache.fineract.spm.domain;
 
-import java.util.Date;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.OrderBy;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.portfolio.client.domain.Client;
 import org.apache.fineract.useradministration.domain.AppUser;
@@ -57,9 +55,8 @@ public class Scorecard extends AbstractPersistableCustom {
     private Client client;
 
     @Column(name = "created_on")
-    @Temporal(value = TemporalType.TIMESTAMP)
     @OrderBy("createdOn DESC")
-    private Date createdOn;
+    private LocalDateTime createdOn;
 
     @Column(name = "a_value", precision = 4)
     private Integer value;
@@ -108,11 +105,11 @@ public class Scorecard extends AbstractPersistableCustom {
         this.client = client;
     }
 
-    public Date getCreatedOn() {
+    public LocalDateTime getCreatedOn() {
         return createdOn;
     }
 
-    public void setCreatedOn(Date createdOn) {
+    public void setCreatedOn(LocalDateTime createdOn) {
         this.createdOn = createdOn;
     }
 

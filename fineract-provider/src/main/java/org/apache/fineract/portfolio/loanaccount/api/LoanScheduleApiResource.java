@@ -26,16 +26,17 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.util.HashSet;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
@@ -47,35 +48,20 @@ import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSer
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanScheduleData;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.service.LoanScheduleCalculationPlatformService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/loans/{loanId}/schedule")
+@Path("/v1/loans/{loanId}/schedule")
 @Component
-@Scope("singleton")
 @Tag(name = "Loan Rescheduling", description = "Loan Term Variations provides the ability to change due dates, amounts and number of instalments before loan approval.")
+@RequiredArgsConstructor
 public class LoanScheduleApiResource {
 
-    private final String resourceNameForPermissions = "LOAN";
+    private static final String RESOURCE_NAME_FOR_PERMISSIONS = "LOAN";
     private final PlatformSecurityContext context;
     private final DefaultToApiJsonSerializer<LoanScheduleData> toApiJsonSerializer;
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
     private final LoanScheduleCalculationPlatformService calculationPlatformService;
     private final ApiRequestParameterHelper apiRequestParameterHelper;
-
-    @Autowired
-    public LoanScheduleApiResource(final PlatformSecurityContext context,
-            final DefaultToApiJsonSerializer<LoanScheduleData> toApiJsonSerializer,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService,
-            final LoanScheduleCalculationPlatformService calculationPlatformService,
-            final ApiRequestParameterHelper apiRequestParameterHelper) {
-        this.context = context;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-        this.calculationPlatformService = calculationPlatformService;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-    }
 
     @POST
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -94,12 +80,12 @@ public class LoanScheduleApiResource {
 
         CommandWrapper commandRequest = null;
         if (is(commandParam, "calculateLoanSchedule")) {
-            this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+            this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
             final LoanScheduleData loanSchedule = this.calculationPlatformService.generateLoanScheduleForVariableInstallmentRequest(loanId,
                     apiRequestBodyAsJson);
 
             final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-            return this.toApiJsonSerializer.serialize(settings, loanSchedule, new HashSet<String>());
+            return this.toApiJsonSerializer.serialize(settings, loanSchedule, new HashSet<>());
         } else if (is(commandParam, "addVariations")) {
             commandRequest = new CommandWrapperBuilder().createScheduleExceptions(loanId).withJson(apiRequestBodyAsJson).build();
         } else if (is(commandParam, "deleteVariations")) {

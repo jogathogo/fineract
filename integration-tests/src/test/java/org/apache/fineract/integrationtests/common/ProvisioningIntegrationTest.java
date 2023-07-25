@@ -26,21 +26,18 @@ import io.restassured.path.json.JsonPath;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.math.BigDecimal;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.integrationtests.common.accounting.AccountHelper;
 import org.apache.fineract.integrationtests.common.loans.LoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanStatusChecker;
+import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.apache.fineract.integrationtests.common.provisioning.ProvisioningHelper;
 import org.apache.fineract.integrationtests.common.provisioning.ProvisioningTransactionHelper;
@@ -48,10 +45,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
+@ExtendWith(LoanTestLifecycleExtension.class)
 public class ProvisioningIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProvisioningIntegrationTest.class);
@@ -69,6 +68,7 @@ public class ProvisioningIntegrationTest {
         this.requestSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
         this.requestSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey());
         this.responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
+        this.requestSpec.header("Fineract-Platform-TenantId", "default");
         this.loanTransactionHelper = new LoanTransactionHelper(this.requestSpec, this.responseSpec);
         this.accountHelper = new AccountHelper(this.requestSpec, this.responseSpec);
         Assumptions.assumeTrue(!isAlreadyProvisioningEntriesCreated());
@@ -100,7 +100,7 @@ public class ProvisioningIntegrationTest {
             LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
             LOG.info("-------------------------------DISBURSE LOAN-------------------------------------------");
             String loanDetails = this.loanTransactionHelper.getLoanDetails(this.requestSpec, this.responseSpec, loanID);
-            loanStatusHashMap = this.loanTransactionHelper.disburseLoan("20 September 2011", loanID,
+            loanStatusHashMap = this.loanTransactionHelper.disburseLoanWithNetDisbursalAmount("20 September 2011", loanID,
                     JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
             LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
             Assertions.assertNotNull(loanID);
@@ -256,14 +256,10 @@ public class ProvisioningIntegrationTest {
         boolean provisioningetryAlreadyCreated = false;
         if (pageItems != null) {
             for (Map item : pageItems) {
-                String date = (String) item.get("createdDate");
-                DateFormat formatter = new SimpleDateFormat("MMM dd, yyyy");
-                Date date1 = formatter.parse(date);
-                DateFormat simple = new SimpleDateFormat("dd MMMM yyyy", Locale.US);
-                String formattedString = simple
-                        .format(Date.from(Utils.getLocalDateOfTenant().atStartOfDay(DateUtils.getDateTimeZoneOfTenant()).toInstant()));
-                Date currentDate = simple.parse(formattedString);
-                if (date1.getTime() == currentDate.getTime()) {
+                List<Integer> date = (ArrayList) item.get("createdDate");
+                LocalDate localDate = LocalDate.of(date.get(0), date.get(1), date.get(2));
+
+                if (localDate.equals(Utils.getLocalDateOfTenant())) {
                     provisioningetryAlreadyCreated = true;
                     break;
                 }

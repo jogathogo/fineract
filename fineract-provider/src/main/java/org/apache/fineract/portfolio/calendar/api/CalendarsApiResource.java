@@ -19,6 +19,19 @@
 package org.apache.fineract.portfolio.calendar.api;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,19 +39,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
@@ -56,25 +57,24 @@ import org.apache.fineract.portfolio.calendar.exception.CalendarEntityTypeNotSup
 import org.apache.fineract.portfolio.calendar.service.CalendarDropdownReadPlatformService;
 import org.apache.fineract.portfolio.calendar.service.CalendarReadPlatformService;
 import org.apache.fineract.portfolio.calendar.service.CalendarUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-@Path("/{entityType}/{entityId}/calendars")
+@Path("/v1/{entityType}/{entityId}/calendars")
 @Component
-@Scope("singleton")
 @Tag(name = "Calendar", description = "")
+@RequiredArgsConstructor
 public class CalendarsApiResource {
 
     /**
      * The set of parameters that are supported in response for {@link Calendar}
      */
-    private final Set<String> responseDataParameters = new HashSet<>(Arrays.asList("id", "entityId", "entityType", "title", "description",
-            "location", "startDate", "endDate", "duration", "type", "repeating", "recurrence", "frequency", "interval", "repeatsOnDay",
-            "remindBy", "firstReminder", "secondReminder", "humanReadable", "createdDate", "lastUpdatedDate", "createdByUserId",
-            "createdByUsername", "lastUpdatedByUserId", "lastUpdatedByUsername", "recurringDates", "nextTenRecurringDates",
-            "entityTypeOptions", "calendarTypeOptions", "remindByOptions", "frequencyOptions", "repeatsOnDayOptions"));
-    private final String resourceNameForPermissions = "CALENDAR";
+    private static final Set<String> RESPONSE_DATA_PARAMETERS = new HashSet<>(
+            Arrays.asList("id", "entityId", "entityType", "title", "description", "location", "startDate", "endDate", "duration", "type",
+                    "repeating", "recurrence", "frequency", "interval", "repeatsOnDay", "remindBy", "firstReminder", "secondReminder",
+                    "humanReadable", "createdDate", "lastUpdatedDate", "createdByUserId", "createdByUsername", "lastUpdatedByUserId",
+                    "lastUpdatedByUsername", "recurringDates", "nextTenRecurringDates", "entityTypeOptions", "calendarTypeOptions",
+                    "remindByOptions", "frequencyOptions", "repeatsOnDayOptions"));
+    private static final String RESOURCE_NAME_FOR_PERMISSIONS = "CALENDAR";
 
     private final PlatformSecurityContext context;
     private final CalendarReadPlatformService readPlatformService;
@@ -83,19 +83,6 @@ public class CalendarsApiResource {
     private final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService;
     private final CalendarDropdownReadPlatformService dropdownReadPlatformService;
 
-    @Autowired
-    public CalendarsApiResource(final PlatformSecurityContext context, final CalendarReadPlatformService readPlatformService,
-            final DefaultToApiJsonSerializer<CalendarData> toApiJsonSerializer, final ApiRequestParameterHelper apiRequestParameterHelper,
-            final PortfolioCommandSourceWritePlatformService commandsSourceWritePlatformService,
-            final CalendarDropdownReadPlatformService dropdownReadPlatformService) {
-        this.context = context;
-        this.readPlatformService = readPlatformService;
-        this.toApiJsonSerializer = toApiJsonSerializer;
-        this.apiRequestParameterHelper = apiRequestParameterHelper;
-        this.commandsSourceWritePlatformService = commandsSourceWritePlatformService;
-        this.dropdownReadPlatformService = dropdownReadPlatformService;
-    }
-
     @GET
     @Path("{calendarId}")
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -103,7 +90,7 @@ public class CalendarsApiResource {
     public String retrieveCalendar(@PathParam("calendarId") final Long calendarId, @PathParam("entityType") final String entityType,
             @PathParam("entityId") final Long entityId, @Context final UriInfo uriInfo) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         final Integer entityTypeId = CalendarEntityType.valueOf(entityType.toUpperCase()).getValue();
         CalendarData calendarData = this.readPlatformService.retrieveCalendar(calendarId, entityId, entityTypeId);
 
@@ -119,7 +106,7 @@ public class CalendarsApiResource {
         if (settings.isTemplate()) {
             calendarData = handleTemplate(calendarData);
         }
-        return this.toApiJsonSerializer.serialize(settings, calendarData, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, calendarData, RESPONSE_DATA_PARAMETERS);
     }
 
     /**
@@ -135,7 +122,7 @@ public class CalendarsApiResource {
     public String retrieveCalendarsByEntity(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
             @Context final UriInfo uriInfo, @DefaultValue("all") @QueryParam("calendarType") final String calendarType) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         final Set<String> associationParameters = ApiParameterHelper.extractAssociationsForResponseIfProvided(uriInfo.getQueryParameters());
 
@@ -143,11 +130,9 @@ public class CalendarsApiResource {
 
         final List<Integer> calendarTypeOptions = CalendarUtils.createIntegerListFromQueryParameter(calendarType);
 
-        if (!associationParameters.isEmpty()) {
-            if (associationParameters.contains("parentCalendars")) {
-                calendarsData.addAll(this.readPlatformService.retrieveParentCalendarsByEntity(entityId,
-                        CalendarEntityType.valueOf(entityType.toUpperCase()).getValue(), calendarTypeOptions));
-            }
+        if (!associationParameters.isEmpty() && associationParameters.contains("parentCalendars")) {
+            calendarsData.addAll(this.readPlatformService.retrieveParentCalendarsByEntity(entityId,
+                    CalendarEntityType.valueOf(entityType.toUpperCase()).getValue(), calendarTypeOptions));
         }
 
         calendarsData.addAll(this.readPlatformService.retrieveCalendarsByEntity(entityId,
@@ -157,7 +142,7 @@ public class CalendarsApiResource {
         calendarsData = this.readPlatformService.updateWithRecurringDates(calendarsData);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, calendarsData, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, calendarsData, RESPONSE_DATA_PARAMETERS);
     }
 
     @GET
@@ -167,13 +152,13 @@ public class CalendarsApiResource {
     public String retrieveNewCalendarDetails(@Context final UriInfo uriInfo, @PathParam("entityType") final String entityType,
             @PathParam("entityId") final Long entityId) {
 
-        this.context.authenticatedUser().validateHasReadPermission(this.resourceNameForPermissions);
+        this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
 
         CalendarData calendarData = this.readPlatformService.retrieveNewCalendarDetails();
         calendarData = handleTemplate(calendarData);
 
         final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
-        return this.toApiJsonSerializer.serialize(settings, calendarData, this.responseDataParameters);
+        return this.toApiJsonSerializer.serialize(settings, calendarData, RESPONSE_DATA_PARAMETERS);
     }
 
     @POST

@@ -18,7 +18,7 @@
  */
 package org.apache.fineract.infrastructure.entityaccess.service;
 
-import java.util.Date;
+import java.time.LocalDate;
 import org.apache.fineract.infrastructure.codes.domain.CodeValueRepositoryWrapper;
 import org.apache.fineract.infrastructure.codes.service.CodeValueReadPlatformService;
 import org.apache.fineract.infrastructure.configuration.domain.GlobalConfigurationProperty;
@@ -87,10 +87,10 @@ public class FineractEntityAccessUtil {
 
             if (restrictToUserOfficeProperty.isEnabled()) {
                 final Long officeId = thisUser.getOffice().getId();
-                Date startDateFormapping = null;
-                Date endDateFormapping = null;
+                LocalDate startDateFormapping = null;
+                LocalDate endDateFormapping = null;
                 FineractEntityRelation fineractEntityRelation = fineractEntityRelationRepositoryWrapper
-                        .findOneByCodeName(fineractEntityAccessType.toStr());
+                        .findOneByCodeName(fineractEntityAccessType.getStr());
                 Long relId = fineractEntityRelation.getId();
                 final FineractEntityRelation mapId = this.fineractEntityRelationRepositoryWrapper.findOneWithNotFoundDetection(relId);
                 final FineractEntityToEntityMapping newMap = FineractEntityToEntityMapping.newMap(mapId, officeId, productOrChargeId,
