@@ -449,6 +449,11 @@ public class LoanTransactionHelper extends IntegrationTest {
         return performLoanTransaction(createGlimAccountURL(DISBURSE_LOAN_COMMAND, glimID), getDisbursementAsJSON(date));
     }
 
+    public HashMap disburseLoanWithNetDisbursalAmount(final String date, final Integer loanID, final String netDisbursalAmount) {
+        return performLoanTransaction(createLoanOperationURL(DISBURSE_LOAN_COMMAND, loanID),
+                getDisburseLoanAsJSON(date, null, netDisbursalAmount));
+    }
+
     public HashMap undoDisburseGlimAccount(final Integer glimID) {
         log.info("--------------------------------- UNDO DISBURSAL GLIM APPLICATION -------------------------------");
         final String undoBodyJson = "{'note':'UNDO DISBURSAL'}";
@@ -1569,6 +1574,15 @@ public class LoanTransactionHelper extends IntegrationTest {
                 "/fineract-provider/api/v1/imports/getOutputTemplateLocation" + "?" + Utils.TENANT_IDENTIFIER, importDocumentId);
     }
 
+<<<<<<< HEAD
+    public boolean checkForLastInstallmentLessThanEMI(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
+            final Integer loanID, final Float emiAmount) {
+        ArrayList<HashMap> loanSchedule = this.getLoanRepaymentSchedule(this.requestSpec, this.responseSpec, loanID);
+        String principal = String.valueOf(loanSchedule.get(loanSchedule.size() - 1).get("principalOriginalDue"));
+        String interest = String.valueOf(loanSchedule.get(loanSchedule.size() - 1).get("interestOriginalDue"));
+        Float amount = Float.parseFloat(principal) + Float.parseFloat(interest);
+        return amount.compareTo(emiAmount) <= 0;
+=======
     public static HashMap<String, Object> getLoanAuditFields(final RequestSpecification requestSpec,
             final ResponseSpecification responseSpec, final Integer loanId, final String jsonReturn) {
         final String GET_LOAN_URL = "/fineract-provider/api/v1/internal/loan/" + loanId + "/audit?" + Utils.TENANT_IDENTIFIER;
@@ -1858,5 +1872,6 @@ public class LoanTransactionHelper extends IntegrationTest {
 
     public PutLoanProductsProductIdResponse updateLoanProduct(Long id, PutLoanProductsProductIdRequest requestModifyLoan) {
         return ok(fineract().loanProducts.updateLoanProduct(id, requestModifyLoan));
+>>>>>>> develop
     }
 }

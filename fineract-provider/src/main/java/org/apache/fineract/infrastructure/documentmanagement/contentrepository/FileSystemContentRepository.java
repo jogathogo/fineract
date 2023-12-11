@@ -49,6 +49,12 @@ public class FileSystemContentRepository implements ContentRepository {
     private final FileSystemContentPathSanitizer pathSanitizer;
     private final FineractProperties fineractProperties;
 
+    private final FileSystemContentPathSanitizer pathSanitizer;
+
+    public FileSystemContentRepository(final FileSystemContentPathSanitizer pathSanitizer) {
+        this.pathSanitizer = pathSanitizer;
+    }
+
     @Override
     public String saveFile(final InputStream uploadedInputStream, final DocumentCommand documentCommand) {
         final String fileName = documentCommand.getFileName();
@@ -92,6 +98,15 @@ public class FileSystemContentRepository implements ContentRepository {
     }
 
     private void deleteFileInternal(final String documentPath) {
+<<<<<<< HEAD
+        String path = pathSanitizer.sanitize(documentPath);
+
+        final File fileToBeDeleted = new File(path);
+        final boolean fileDeleted = fileToBeDeleted.delete();
+        if (!fileDeleted) {
+            // no need to throw an Error, what's a caller going to do about it, so simply log a warning
+            LOG.warn("Unable to delete file {}", path);
+=======
         String sanitizedPath = pathSanitizer.sanitize(documentPath);
 
         final File fileToBeDeleted = new File(sanitizedPath);
@@ -99,22 +114,36 @@ public class FileSystemContentRepository implements ContentRepository {
         if (!fileDeleted) {
             // no need to throw an Error, what's a caller going to do about it, so simply log a warning
             log.warn("Unable to delete file {}", documentPath);
+>>>>>>> develop
         }
     }
 
     @Override
     public FileData fetchFile(final DocumentData documentData) {
+<<<<<<< HEAD
+        String path = pathSanitizer.sanitize(documentData.fileLocation());
+
+        final File file = new File(path);
+        return new FileData(Files.asByteSource(file), file.getName(), documentData.contentType());
+=======
         String sanitizedPath = pathSanitizer.sanitize(documentData.fileLocation());
 
         final File file = new File(sanitizedPath);
         return new FileData(Files.asByteSource(file), documentData.fileName(), documentData.contentType());
+>>>>>>> develop
     }
 
     @Override
     public FileData fetchImage(final ImageData imageData) {
+<<<<<<< HEAD
+        String path = pathSanitizer.sanitize(imageData.location());
+
+        final File file = new File(path);
+=======
         String sanitizedPath = pathSanitizer.sanitize(imageData.location());
 
         final File file = new File(sanitizedPath);
+>>>>>>> develop
         return new FileData(Files.asByteSource(file), imageData.getEntityDisplayName(), imageData.contentType().getValue());
     }
 
@@ -150,12 +179,19 @@ public class FileSystemContentRepository implements ContentRepository {
         Files.createParentDirs(new File(sanitizedPath));
     }
 
+<<<<<<< HEAD
+    private void writeFileToFileSystem(final String fileName, final InputStream uploadedInputStream, final String fileLocation) {
+=======
     private String writeFileToFileSystem(final String fileName, final InputStream uploadedInputStream, final String fileLocation) {
+>>>>>>> develop
         try (BufferedInputStream bis = new BufferedInputStream(uploadedInputStream)) {
             String sanitizedPath = pathSanitizer.sanitize(fileLocation, bis);
             makeDirectories(sanitizedPath);
             FileUtils.copyInputStreamToFile(bis, new File(sanitizedPath)); // NOSONAR
+<<<<<<< HEAD
+=======
             return sanitizedPath;
+>>>>>>> develop
         } catch (final IOException ioException) {
             log.warn("Failed to write file!", ioException);
             throw new ContentManagementException(fileName, ioException.getMessage(), ioException);

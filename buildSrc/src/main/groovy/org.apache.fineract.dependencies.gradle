@@ -71,6 +71,13 @@ dependencyManagement {
         dependency 'software.amazon.awssdk:bom:2.20.81'
         dependency 'org.ehcache:ehcache:3.10.8'
         dependency 'com.github.spullara.mustache.java:compiler:0.9.10'
+<<<<<<< HEAD
+        dependency 'com.jayway.jsonpath:json-path:2.7.0'
+        dependency 'org.apache.tika:tika-core:2.4.0'
+        dependency ('org.apache.tika:tika-parser-microsoft-module:2.4.0') {
+            exclude 'org.bouncycastle:bcprov-jdk15on'
+            exclude 'org.bouncycastle:bcmail-jdk15on'
+=======
         dependency 'com.jayway.jsonpath:json-path:2.8.0'
         dependency 'org.apache.tika:tika-core:2.8.0'
         dependency ('org.apache.tika:tika-parser-microsoft-module:2.8.0') {
@@ -78,11 +85,15 @@ dependencyManagement {
             exclude 'org.bouncycastle:bcmail-jdk15on'
             exclude 'org.bouncycastle:bcprov-jdk18on'
             exclude 'org.bouncycastle:bcmail-jdk18on'
+>>>>>>> develop
             exclude 'commons-logging:commons-logging'
             exclude 'org.apache.logging.log4j:log4j-api'
             exclude 'org.slf4j:slf4j-api'
             exclude 'commons-io:commons-io'
+<<<<<<< HEAD
+=======
             exclude 'commons-logging:commons-logging'
+>>>>>>> develop
             exclude 'commons-codec:commons-codec'
             exclude 'org.apache.commons:commons-compress'
             exclude 'org.apache.commons:commons-lang3'
@@ -92,11 +103,17 @@ dependencyManagement {
             exclude 'org.apache.commons:commons-compress'
             exclude 'xml-apis:xml-apis'
         }
+<<<<<<< HEAD
+        dependency ('org.apache.tika:tika-parser-miscoffice-module:2.4.0') {
+            exclude 'org.bouncycastle:bcprov-jdk15on'
+            exclude 'org.bouncycastle:bcmail-jdk15on'
+=======
         dependency ('org.apache.tika:tika-parser-miscoffice-module:2.8.0') {
             exclude 'org.bouncycastle:bcprov-jdk15on'
             exclude 'org.bouncycastle:bcmail-jdk15on'
             exclude 'org.bouncycastle:bcprov-jdk18on'
             exclude 'org.bouncycastle:bcmail-jdk18on'
+>>>>>>> develop
             exclude 'commons-logging:commons-logging'
             exclude 'org.apache.logging.log4j:log4j-api'
             exclude 'org.slf4j:slf4j-api'
@@ -110,9 +127,13 @@ dependencyManagement {
             exclude 'org.apache.commons:commons-compress'
             exclude 'xml-apis:xml-apis'
         }
+<<<<<<< HEAD
+        dependency 'org.apache.httpcomponents:httpclient:4.5.13'
+=======
         dependency ('org.apache.httpcomponents:httpclient:4.5.14') {
             exclude 'commons-logging:commons-logging:'
         }
+>>>>>>> develop
         dependency 'jakarta.management.j2ee:jakarta.management.j2ee-api:1.1.4'
         dependency 'jakarta.jms:jakarta.jms-api:3.1.0'
         dependency 'jakarta.ws.rs:jakarta.ws.rs-api:3.1.0'

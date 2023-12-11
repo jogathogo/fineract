@@ -18,18 +18,34 @@
  */
 package org.apache.fineract.infrastructure.documentmanagement.contentrepository;
 
+<<<<<<< HEAD
+import lombok.RequiredArgsConstructor;
+import org.apache.fineract.infrastructure.configuration.data.S3CredentialsData;
+import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
+import org.apache.fineract.infrastructure.configuration.service.ExternalServicesPropertiesReadPlatformService;
+import org.apache.fineract.infrastructure.documentmanagement.domain.StorageType;
+import org.springframework.context.ApplicationContext;
+=======
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.config.FineractProperties;
 import org.apache.fineract.infrastructure.documentmanagement.domain.StorageType;
+>>>>>>> develop
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class ContentRepositoryFactory {
 
+<<<<<<< HEAD
+    private final ApplicationContext applicationContext;
+    private final ExternalServicesPropertiesReadPlatformService externalServicesReadPlatformService;
+
+    private final FileSystemContentPathSanitizer contentPathSanitizer;
+=======
     private final FineractProperties fineractProperties;
     private final List<ContentRepository> contentRepositories;
+>>>>>>> develop
 
     public ContentRepository getRepository() {
         if (fineractProperties.getContent() != null) {
@@ -41,9 +57,20 @@ public class ContentRepositoryFactory {
                 return getRepository(StorageType.S3);
             }
         }
+<<<<<<< HEAD
+        return new FileSystemContentRepository(contentPathSanitizer);
+    }
+
+    public ContentRepository getRepository(final StorageType documentStoreType) {
+        if (documentStoreType == StorageType.FILE_SYSTEM) {
+            return new FileSystemContentRepository(contentPathSanitizer);
+        }
+        return createS3DocumentStore();
+=======
 
         throw new RuntimeException(
                 "No content repository enabled. Please set either 'fineract.content.filesystem.enabled=true' or 'fineract.content.s3.enabled=true' in your application.properties.");
+>>>>>>> develop
     }
 
     public ContentRepository getRepository(StorageType storageType) {

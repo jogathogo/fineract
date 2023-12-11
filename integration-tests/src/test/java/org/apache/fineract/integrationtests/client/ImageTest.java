@@ -20,6 +20,10 @@ package org.apache.fineract.integrationtests.client;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+<<<<<<< HEAD
+import java.io.File;
+=======
+>>>>>>> develop
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;

@@ -43,7 +43,10 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.infrastructure.core.config.FineractProperties;
+<<<<<<< HEAD
+=======
 import org.apache.fineract.infrastructure.core.service.ThreadLocalContextUtil;
+>>>>>>> develop
 import org.apache.fineract.template.domain.Template;
 import org.apache.fineract.template.domain.TemplateFunctions;
 import org.apache.fineract.template.exception.TemplateForbiddenException;
@@ -56,6 +59,10 @@ import org.springframework.stereotype.Service;
 public class TemplateMergeService {
 
     private final FineractProperties fineractProperties;
+<<<<<<< HEAD
+    private Map<String, Object> scopes;
+    private String authToken;
+=======
 
     // TODO Replace this with appropriate alternative available in Guava
     private static String getStringFromInputStream(final InputStream is) {
@@ -70,6 +77,7 @@ public class TemplateMergeService {
         } catch (final IOException e) {
             log.error("getStringFromInputStream() failed", e);
         }
+>>>>>>> develop
 
         return sb.toString();
     }
@@ -148,8 +156,12 @@ public class TemplateMergeService {
             }
         }
 
+<<<<<<< HEAD
+        if (this.authToken == null) {
+=======
         String authToken = ThreadLocalContextUtil.getAuthToken();
         if (authToken == null) {
+>>>>>>> develop
             final String name = SecurityContextHolder.getContext().getAuthentication().getName();
             final String password = SecurityContextHolder.getContext().getAuthentication().getCredentials().toString();
 
@@ -179,6 +191,37 @@ public class TemplateMergeService {
         return connection;
     }
 
+<<<<<<< HEAD
+    // TODO Replace this with appropriate alternative available in Guava
+    private static String getStringFromInputStream(final InputStream is) {
+        BufferedReader br = null;
+        final StringBuilder sb = new StringBuilder();
+
+        String line;
+        try {
+
+            br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+        } catch (final IOException e) {
+            log.error("getStringFromInputStream() failed", e);
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (final IOException e) {
+                    log.error("Problem occurred in getStringFromInputStream function", e);
+                }
+            }
+        }
+
+        return sb.toString();
+    }
+
+=======
+>>>>>>> develop
     @SuppressWarnings("unchecked")
     private void expandMapArrays(Object value) {
         if (value instanceof Map) {

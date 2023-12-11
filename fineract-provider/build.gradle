@@ -308,10 +308,17 @@ jib {
 
 task migrateDatabase {
     doFirst {
+<<<<<<< HEAD
+        println "Executing liquibase database migration to version $dbVersion"
+
+        def dbUrl = "jdbc:$dbType://$dbHost$dbPort/$dbName"
+        def changeLogFilePath = "fineract-provider/src/main/resources/db/changelog/tenant/upgrades/0000_upgrade_to_$dbVersion.xml"
+=======
         println 'Executing liquibase database migration to version '+"$dbVersion"
 
         def dbUrl='jdbc:'+"$dbType"+'://'+"$dbHost"+':'+"$dbPort"+'/'+"$dbName"
         def changeLogFilePath='fineract-provider/src/main/resources/db/changelog/tenant/upgrades/0000_upgrade_to_'+"$dbVersion"+'.xml'
+>>>>>>> develop
 
         liquibase {
             activities {
@@ -326,12 +333,15 @@ task migrateDatabase {
     }
 }
 
+<<<<<<< HEAD
+=======
 cucumber {
     tags = 'not @ignore'
     main = 'io.cucumber.core.cli.Main'
     shorten = 'argfile'
 }
 
+>>>>>>> develop
 tasks.jibDockerBuild.dependsOn(bootJar)
 
 // Configuration for git properties gradle plugin

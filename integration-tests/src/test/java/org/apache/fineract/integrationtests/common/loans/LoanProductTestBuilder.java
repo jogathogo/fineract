@@ -139,9 +139,12 @@ public class LoanProductTestBuilder {
     private String fixedPrincipalPercentagePerInstallment;
     private String installmentAmountInMultiplesOf;
     private boolean canDefineInstallmentAmount;
+<<<<<<< HEAD
+=======
     private Integer delinquencyBucketId;
     private Integer dueDaysForRepaymentEvent = null;
     private Integer overDueDaysForRepaymentEvent = null;
+>>>>>>> develop
 
     public String build(final String chargeId) {
         final HashMap<String, Object> map = build(chargeId, null);
@@ -185,6 +188,8 @@ public class LoanProductTestBuilder {
         if (this.minimumDaysBetweenDisbursalAndFirstRepayment != null) {
             map.put("minimumDaysBetweenDisbursalAndFirstRepayment", this.minimumDaysBetweenDisbursalAndFirstRepayment);
         }
+<<<<<<< HEAD
+=======
         if (this.multiDisburseLoan) {
             map.put("multiDisburseLoan", this.multiDisburseLoan);
             map.put("maxTrancheCount", this.maxTrancheCount);
@@ -196,6 +201,7 @@ public class LoanProductTestBuilder {
                 map.put("overAppliedNumber", this.overAppliedNumber);
             }
         }
+>>>>>>> develop
         if (this.canDefineInstallmentAmount) {
             map.put("canDefineInstallmentAmount", this.canDefineInstallmentAmount);
         }
@@ -553,6 +559,11 @@ public class LoanProductTestBuilder {
 
     public LoanProductTestBuilder withDaysInYear(final String daysInYearType) {
         this.daysInYearType = daysInYearType;
+        return this;
+    }
+
+    public LoanProductTestBuilder withDefineInstallmentAmount(final boolean canDefineInstallmentAmount) {
+        this.canDefineInstallmentAmount = canDefineInstallmentAmount;
         return this;
     }
 

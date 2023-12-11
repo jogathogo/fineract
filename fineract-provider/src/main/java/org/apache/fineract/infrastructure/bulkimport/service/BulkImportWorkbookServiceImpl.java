@@ -18,7 +18,10 @@
  */
 package org.apache.fineract.infrastructure.bulkimport.service;
 
+<<<<<<< HEAD
+=======
 import jakarta.ws.rs.core.Response;
+>>>>>>> develop
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

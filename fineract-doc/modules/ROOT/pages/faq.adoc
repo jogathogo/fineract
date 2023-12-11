@@ -1,0 +1,61 @@
+== About the Project
+
+At Apache Fineract, our mission is to develop, maintain, and enhance a cloud-ready core banking system that enables robust, scalable, and secure operations for financial institutions. We believe in providing financial services to everyone, including the unbanked and underbanked population.
+
+The scope of Fineract encompasses customer accounts with various types, including credit accounts (such as loans) and debit accounts (current and savings accounts). It also includes functionalities related to teller operations, basic treasury management, accounting, portfolio management, authentication, account opening (including Know Your Customer - KYC), and other common features in retail banking.
+
+While initially aimed at Microfinance Institutions (MFIs), Savings Cooperatives, and Credit Unions, Fineract is not limited to these specific institutions. FinTech innovators have adopted Fineract as their backend solution for offering "Direct Banking" or "Neo-Banking" solutions, as well as for "Agent Management" in some contexts. The backend account transaction system is a fundamental requirement in various financial services systems.
+
+Fineract was donated by Mifos.org, a US-based charity with a mission for financial inclusion. Mifos.org had developed the fully featured MifosX and released it as open source in 2010. Although many members of the project management committee (PMC) have been involved in financial inclusion, the project aims to attract a wide range of innovators involved in offering account services worldwide. The goal is to make financial services accessible to all.
+
+The open-source nature of the project allows for the development of building blocks that financial institutions of all types can use. We anticipate an ecosystem of providers who will take this code and build solutions on top of it. We encourage and expect these builders to contribute to the project by prioritizing development efforts and dedicating their in-house development teams. This virtuous cycle is crucial for the project's success.
+
+We envision a world where financial services are offered by a diverse range of providers using open-source software based on modern approaches.
+
+== User Base
+
+Fineract is used by numerous small to medium-sized financial institutions in many countries. Larger institutions are also considering using Fineract alongside their existing core banking solutions to enable innovative offerings without the licensing costs associated with commercial solutions. Fineract has been adopted by FinTech companies as the backend transaction account engine and is being used in testing-lab environments to assist with system integrations.
+
+With proper hosting and front-end development, Fineract is suitable for Credit Unions, Microfinance Institutions, Agent Banking solutions, Savings Associations, Building Societies, Cooperatives, small Commercial Banks, NeoBanks, and Direct Banking solutions. Our vision is for these institutions to either download and use Fineract directly or hire a provider or integrator to deliver the complete solution. Our users include both institutions where Fineract is in place and system integrators and vendors for whom Fineract is a significant part of their offering.
+
+= Relationship with Mifos
+
+The Mifos Initiative, a US charity organization (501c3), contributed the code that forms the basis of Fineract. The Mifos Initiative continues to be involved with various front-end implementations and other systems that run on top of Fineract, including a payment hub and API management. Many developers are active in both the Mifos and Fineract communities. For information on the latest Mifos release, please refer to https://mifos.org/take-action/get-mifos/#download. Developers from the Fineract community may not respond to questions about Mifos code.
+
+= Front-End and Reports
+
+Fineract focuses solely on providing the back-end platform and APIs. Front-end development is intentionally left out of the Fineract 1.x project
+
+to encourage software integrators to develop their own front-end solutions. The Mifos project has several open-source front-end user interface (UI) projects, such as the MifosX Community app (AngularJS project), reporting through Pentaho, and client and staff-facing mobile apps. It's important to note that demo servers running Fineract may come packaged with the open-source Mifos front-end UI (available at openmf.github.org), but this front-end may not include all the latest features developed in Fineract. Fineract-CN, on the other hand, has a web front-end UI under development specifically intended as a demo.
+
+== Difference between Fineract and Fineract-CN
+
+Fineract 1.x is a mature platform with open APIs, while Fineract-CN is a cloud-native, microservice architecture that also supports open banking APIs. The two are completely separate code projects. In terms of GitHub repositories, Fineract 1.x is contained in a single repo, whereas Fineract-CN is held in dozens of separate GitHub repos, with each repo corresponding to a microservice. Fineract 1.x packages encapsulate different functional blocks, while Fineract-CN utilizes separate microservices. Additionally, Fineract 1.x is a "headless" solution focused on APIs, while Fineract-CN microservices can be combined to create new software platforms for digital financial service providers. Fineract-CN also includes a fully Apache-licensed back-office UI.
+
+== Usage and Code Availability
+
+If you only want to use or demo the solution, it is recommended to use one of the available builds from the Apache Fineract website (http://fineract.apache.org/downloads). These builds are convenient but should not be used in a production environment without thorough consideration of operational details (e.g., data backup) and security. Mifos volunteers also provide builds for specific hosting solutions, such as Azure and AWS, which can be found at https://en.wikipedia.org/wiki/Mifos_X.
+
+To get the code and set up a development environment, please refer to the Contributor's Zone documentation. It provides instructions on preparing your environment, downloading the source code from GitHub, and using common IDEs. Before posting questions about building the solution, it is recommended to read the instructions and familiarize yourself with the mailing list (listserv) and search the mailing list archives at https://lists.apache.org/list.html?fineract.apache.org. Contributions to improve the instructions are also welcomed. Please note that discussions and communication primarily happen on the mailing list.
+
+To get up to speed on development tasks, the Contributor's Zone is a valuable resource. There are two issue trackers: one for Fineract 1.x at https://issues.apache.org/jira/projects/FINERACT/summary and another for Fineract-CN at https://issues.apache.org/jira/projects/FINCN/issues/FINCN-26?filter=allopenissues. Reviewing open tickets and pull requests (PRs) can provide insight into ongoing development efforts.
+
+== Consensus Approach
+
+The project follows a lazy consensus approach, where changes and issues are raised, and contributors are given time to discuss and review them. The project relies on contributors to thoroughly vet changes and have their code reviewed. Details about this approach can be found in the Committer's Zone and Changing Processes documentation. The primary mode of communication is through the mailing list, and it is essential to note that discussions on the mailing list are the primary means of decision-making.
+
+== Introduction to Open Source
+
+If you are new to open source, it is recommended to read about how open source projects function and familiarize yourself with how the Apache Foundation operates. A helpful resource can be found at https://www.apache.org/foundation.
+
+Welcome to the world of open source! Open source projects operate in a collaborative and transparent manner, allowing developers from around the world to contribute to the project's development. The Apache Foundation, in particular, follows a meritocratic model where contributions are recognized based on their quality and impact.
+
+By participating in an open source project like Apache Fineract, you have the opportunity to learn from experienced developers, gain practical coding experience, and contribute to a project that aims to provide financial services to a wide range of institutions and users.
+
+To get started, it is recommended to explore the project's documentation, join the mailing list or community forums, and review the existing codebase and issue trackers. This will give you an understanding of the project's goals, ongoing development efforts, and areas where you can contribute.
+
+As you familiarize yourself with the project, you can start by tackling small tasks or bugs, submitting patches, and engaging in discussions on the mailing list. Remember to follow the project's coding standards and guidelines and seek feedback from the community to improve your contributions.
+
+Open source projects thrive on collaboration, so don't hesitate to ask questions, seek guidance, and share your ideas with the community. By actively participating and contributing to the project, you can make a meaningful impact and grow as a developer.
+
+Good luck on your open source journey with Apache Fineract!
