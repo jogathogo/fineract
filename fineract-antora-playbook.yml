@@ -9,6 +9,6 @@ content:
     start_path: fineract-doc
 ui:
   bundle:
-    url: https://github.com/jogathogo/fineract/blob/1.7.3/fineract-doc/ui-bundle.zip
+    url: ui-bundle.zip
     snapshot: true
     
