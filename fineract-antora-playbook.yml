@@ -9,6 +9,6 @@ content:
     start_path: fineract-doc
 ui:
   bundle:
-    url: ui-bundle.zip
+    url: fineract-doc/ui-bundle.zip
     snapshot: true
     
