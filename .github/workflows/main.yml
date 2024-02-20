@@ -19,7 +19,7 @@ jobs:
     - name: Install Antora with the Antora Lunr Extension
       run: npm i antora @antora/lunr-extension
     - name: Generate Site
-      run: npx antora antora-playbook.yml
+      run: npx antora fineract-antora-playbook.yml
     - name: Publish to Cloudflare Pages
       uses: cloudflare/pages-action@v1
       with:
