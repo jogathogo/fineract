@@ -1,0 +1,30 @@
+name: Publish to Cloudflare
+on:
+  push:
+    branches: [1.7.3]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    - name: Install Antora with the Antora Lunr Extension
+      run: npm i antora @antora/lunr-extension
+    - name: Generate Site
+      run: npx antora antora-playbook.yml
+    - name: Publish to Cloudflare Pages
+      uses: cloudflare/pages-action@v1
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: my_account_id
+        projectName: my_cf_project
+        directory: build/site
+        gitHubToken: ${{ secrets.GITHUB_TOKEN }}
