@@ -25,6 +25,6 @@ jobs:
       with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: Jogathogo@gmail.com
-        projectName: new-site
+        projectName: example
         directory: build/site
         gitHubToken: ${{ secrets.GITHUB_TOKEN }}
